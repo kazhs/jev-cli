@@ -1,0 +1,73 @@
+---
+title: ドキュメントナビゲーション
+type: guide
+status: approved
+---
+
+# ドキュメント
+
+## 構成
+
+| ディレクトリ | 区分 | 用途 |
+| --- | --- | --- |
+| `specs/` | 現在の事実 | 仕様書。振る舞い・制約・境界の定義 |
+| `adr/` | 時点の記録 | 意思決定の記録 (不採用の選択肢を含む)。未作成で、最初の1本を書くときに作る |
+| `research/` | 時点の記録 | 調査・計測のレポート。ファイル名は`<YYYYMMDD>-<topic>.md` |
+
+これからやること (チケット) はGitHub Issuesで管理する。`docs/`には置かない。
+
+## ドキュメント一覧
+
+### 仕様書 (specs/)
+
+- [jev-cli 要件](specs/requirements.md) — CLIの要件とMVPの範囲
+
+### 調査 (research/)
+
+- [20260924-existing-jev-clis](research/20260924-existing-jev-clis.md) — 同名の既存jev-cli 5件の調査
+
+## 規約
+
+### フォーマット
+
+Markdown + YAML frontmatterで書く。
+
+```yaml
+---
+title: ドキュメントタイトル
+type: spec        # spec / adr / guide / runbook / research
+status: draft
+---
+```
+
+`status`の候補は`type`ごとに違う。
+
+| type | `status`の候補 |
+| --- | --- |
+| `spec` `guide` `runbook` | `draft` / `review` / `approved` / `deprecated` |
+| `adr` | `proposed` / `approved` / `superseded` / `deprecated` |
+| `research` | 付けない |
+
+### 記述原則
+
+- 「やらないこと (Out of Scope)」も書く
+- 具体例を添える (「適切に」「必要に応じて」等の曖昧な表現を避ける)
+- specには「今どうなっているか」だけを書く。決定の経緯・不採用の案はADRに書く
+- researchは書いたあと更新しない。結論が覆ったら新しいレポートを足す
+
+### ADRの命名
+
+```
+<YYYYMMDD>-<トピック>[-<詳細>].md
+```
+
+連番のprefixは使わない (複数ブランチで同時に足すと、マージ時に採番が衝突するため)。
+
+### ADRの更新
+
+| 変更の種別 | 対応 |
+| --- | --- |
+| 誤記・体裁・リンク切れ | 既存のADRを直接直す |
+| 決定事項の補足 | 既存のADRに追記し、`updated`を更新する |
+| 決定事項そのものの変更・撤回 | 新しいADRを作る。古いADRを`superseded`にし、相互にリンクする |
+| スコープ・前提の追加 | 新しいADRで扱い、関連するADRとして参照する |
