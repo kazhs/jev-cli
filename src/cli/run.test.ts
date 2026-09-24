@@ -183,7 +183,7 @@ describe('run', () => {
     const io = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: '/k' }, files: { '/k': 'k' }, modes: { '/k': 0o100644 } });
     expect(await run(['-s', 'x', ...QUESTIONS], { io, version: '0.0.0', fetch: okFetch() })).toBe(0);
     expect(io.stderr).toContain('accessible by other users');
-    expect(io.stderr).toContain("chmod 600 /k");
+    expect(io.stderr).toContain("chmod 600 '/k'");
     expect(io.stderr).not.toContain('k\n');
   });
 
@@ -199,6 +199,32 @@ describe('run', () => {
     expect(await run(['-s', 'x', ...QUESTIONS], { io: missing, version: '0.0.0', fetch: okFetch() })).toBe(3);
     const empty = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: '/k' }, files: { '/k': '\n' } });
     expect(await run(['-s', 'x', ...QUESTIONS], { io: empty, version: '0.0.0', fetch: okFetch() })).toBe(3);
+  });
+});
+
+describe('キーの検証', () => {
+  it.each([
+    ['環境変数', { AI_GATEWAY_API_KEY: 'sk-a\nsk-b' }, {}],
+    ['キーファイル', { AI_GATEWAY_API_KEY_FILE: '/k' }, { '/k': '# vercel key\nsk-secret-value\n' }],
+  ])('%sのキーに改行があれば、値を出さずに exit 3', async (_label, env, files) => {
+    const bodies: unknown[] = [];
+    const io = fakeIo({ env, files, modes: { '/k': 0o100600 } });
+    expect(await run(['-s', 'x', ...QUESTIONS], { io, version: '0.0.0', fetch: okFetch(bodies) })).toBe(3);
+    expect(bodies).toHaveLength(0);
+    expect(io.stderr).toContain('whitespace or non-printable');
+    expect(io.stderr).not.toMatch(/sk-/);
+  });
+
+  it('権限の警告に出すパスはクォートする', async () => {
+    const io = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: "/my keys/it's" }, files: { "/my keys/it's": 'k' }, modes: { "/my keys/it's": 0o100644 } });
+    expect(await run(['-s', 'x', ...QUESTIONS], { io, version: '0.0.0', fetch: okFetch() })).toBe(0);
+    expect(io.stderr).toContain("chmod 600 '/my keys/it'\\''s'");
+  });
+
+  it('--timeout の上限を超えたら exit 2', async () => {
+    const io = fakeIo();
+    expect(await run(['-s', 'x', ...QUESTIONS, '--timeout', '2147483648'], { io, version: '0.0.0', fetch: okFetch() })).toBe(2);
+    expect(await run(['-s', 'x', ...QUESTIONS, '--timeout', '2147483647'], { io, version: '0.0.0', fetch: okFetch() })).toBe(0);
   });
 });
 

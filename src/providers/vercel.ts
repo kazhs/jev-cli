@@ -3,20 +3,18 @@
 // https://vercel.com/changelog/ai-gateway-now-supports-typesafe-clients-and-http-api-for-jev
 import { CliError, EXIT } from '../errors.js';
 import type { Answer, EvaluateMeta, EvaluateRequest, EvaluateResult, Provider } from './types.js';
+import { errorMessage, isRecord } from '../shared.js';
 
 export const VERCEL_ENDPOINT = 'https://ai-gateway.vercel.sh/v1/evaluate';
 export const VERCEL_API_KEY_ENV = 'AI_GATEWAY_API_KEY';
 
 export type VercelProviderOptions = {
   apiKey: string;
-  endpoint?: string;
-  timeoutMs?: number;
-  fetch?: typeof fetch;
-  now?: () => number;
+  endpoint?: string | undefined;
+  timeoutMs?: number | undefined;
+  fetch?: typeof fetch | undefined;
+  now?: (() => number) | undefined;
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const numberAt = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -57,12 +55,13 @@ export function parseAnswer(value: unknown): Answer | undefined {
 }
 
 // プロバイダ側の所要時間。公式docsの応答例には無いが、実際の応答には
-// routing.modelAttempts[].providerAttempts[].startTime / endTime が入っていた
+// routing.modelAttempts[].providerAttempts[].startTime / endTime が入っていた。
+// リトライ・フォールバックで試行が複数あるときは、最後 (応答を返した) の試行を使う
 function providerMsAt(routing: unknown): number | undefined {
   if (!isRecord(routing) || !Array.isArray(routing.modelAttempts)) return undefined;
-  const modelAttempt: unknown = routing.modelAttempts[0];
+  const modelAttempt: unknown = routing.modelAttempts.at(-1);
   if (!isRecord(modelAttempt) || !Array.isArray(modelAttempt.providerAttempts)) return undefined;
-  const attempt: unknown = modelAttempt.providerAttempts[0];
+  const attempt: unknown = modelAttempt.providerAttempts.at(-1);
   if (!isRecord(attempt)) return undefined;
   const start = numberAt(attempt.startTime);
   const end = numberAt(attempt.endTime);
@@ -115,7 +114,8 @@ export function createVercelProvider(options: VercelProviderOptions): Provider {
         });
         text = await res.text();
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        // fetch のエラー文はヘッダの値を含むことがあるので、キーを伏せてから出す
+        const message = errorMessage(error).replaceAll(options.apiKey, '<redacted>');
         throw new CliError(`request failed: ${message}`, EXIT.api);
       }
       // 手元で測るのは送信から応答本文の受信完了まで (ネットワーク往復を含む)

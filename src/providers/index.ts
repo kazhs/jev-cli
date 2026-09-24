@@ -19,19 +19,17 @@ export const PROVIDER_KEYS: Record<ProviderName, KeySpec> = {
   vercel: { envName: VERCEL_API_KEY_ENV, account: 'vercel' },
 };
 
+export const DEFAULT_PROVIDER: ProviderName = 'vercel';
+
 export type ProviderContext = {
   apiKey: string;
-  timeoutMs?: number;
-  fetch?: typeof fetch;
+  timeoutMs?: number | undefined;
+  fetch?: typeof fetch | undefined;
 };
 
 export function createProvider(name: ProviderName, context: ProviderContext): Provider {
   switch (name) {
     case 'vercel':
-      return createVercelProvider({
-        apiKey: context.apiKey,
-        ...(context.timeoutMs === undefined ? {} : { timeoutMs: context.timeoutMs }),
-        ...(context.fetch === undefined ? {} : { fetch: context.fetch }),
-      });
+      return createVercelProvider(context);
   }
 }

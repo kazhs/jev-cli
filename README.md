@@ -197,7 +197,7 @@ JSON output has this shape:
 | --- | --- |
 | `--model <id>` | The question file's `model`, then `typesafe-ai/jev` |
 | `--provider <name>` | `vercel` |
-| `--timeout <ms>` | `30000` |
+| `--timeout <ms>` | `30000` (1 to 2147483647) |
 
 ## Exit codes
 

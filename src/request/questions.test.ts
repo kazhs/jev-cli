@@ -107,6 +107,17 @@ describe('mergeQuestions', () => {
     expect(Object.keys(mergeQuestions({ a: q }, [['b', q]]))).toEqual(['a', 'b']);
   });
 
+  it('constructor や __proto__ も質問名に使える', () => {
+    const inline = [parseInlineQuestion('boolean', 'constructor=x'), parseInlineQuestion('boolean', '__proto__=y')];
+    const merged = mergeQuestions({}, inline);
+    expect(Object.keys(merged)).toEqual(['constructor', '__proto__']);
+    expect(JSON.stringify(merged)).toBe(
+      '{"constructor":{"type":"boolean","instructions":"x"},"__proto__":{"type":"boolean","instructions":"y"}}',
+    );
+    const file = parseQuestionFile('questions:\n  q:\n    type: choice\n    instructions: x\n    criteria: { __proto__: a, toString: b }\n', 'q.yaml');
+    expect(Object.keys(file.questions.q?.type === 'choice' ? file.questions.q.criteria : {})).toEqual(['__proto__', 'toString']);
+  });
+
   it('名前の衝突と質問0件は使い方の誤り', () => {
     expectUsageError(() => mergeQuestions({ a: q }, [['a', q]]));
     expectUsageError(() => mergeQuestions({}, []));

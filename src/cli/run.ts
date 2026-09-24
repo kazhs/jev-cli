@@ -3,14 +3,14 @@ import { missingKeyMessage, resolveApiKey } from '../credentials/resolve.js';
 import { CliError, EXIT, type ExitCode, usageError } from '../errors.js';
 import type { Io } from '../io/node-io.js';
 import { OUTPUT_FORMATS, type OutputFormat, formatRaw, formatResult } from '../output/format.js';
-import { PROVIDER_KEYS, createProvider, parseProviderName } from '../providers/index.js';
+import { DEFAULT_PROVIDER, PROVIDER_KEYS, createProvider, parseProviderName } from '../providers/index.js';
 import type { EvaluateRequest, Question } from '../providers/types.js';
 import { mergeQuestions, parseInlineQuestion, parseQuestionFile, type QuestionFile } from '../request/questions.js';
 import { buildState, parseStateArg } from '../request/state.js';
 import { credentialContext, runAuth } from './auth.js';
+import { errorMessage } from '../shared.js';
 
 export const DEFAULT_MODEL = 'typesafe-ai/jev';
-export const DEFAULT_PROVIDER = 'vercel';
 
 export const HELP = `usage: jev [options]
        jev auth <set|status|delete>
@@ -82,10 +82,15 @@ function formatForFile(path: string, explicit: OutputFormat | undefined): Output
   return explicit ?? 'text';
 }
 
+// Node のタイマーは 2^31-1ms を超えると 1ms に丸められ、即タイムアウトする
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
 function parseTimeout(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const ms = Number(value);
-  if (!Number.isInteger(ms) || ms <= 0) throw usageError(`--timeout must be a positive integer (ms) (${value})`);
+  if (!Number.isInteger(ms) || ms <= 0 || ms > MAX_TIMEOUT_MS) {
+    throw usageError(`--timeout must be an integer between 1 and ${MAX_TIMEOUT_MS} (ms) (${value})`);
+  }
   return ms;
 }
 
@@ -105,7 +110,7 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
   try {
     parsed = parseArgs({ args: argv, options: OPTIONS, strict: true, allowPositionals: false });
   } catch (error) {
-    throw usageError(error instanceof Error ? error.message : String(error));
+    throw usageError(errorMessage(error));
   }
   const { values } = parsed;
 
@@ -129,7 +134,7 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
     try {
       text = await io.readFile(path);
     } catch (error) {
-      throw usageError(`cannot read question file (${path}): ${error instanceof Error ? error.message : String(error)}`);
+      throw usageError(`cannot read question file (${path}): ${errorMessage(error)}`);
     }
     file = parseQuestionFile(text, path);
   }
@@ -153,8 +158,8 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
   if (resolved === undefined) throw new CliError(missingKeyMessage(keySpec, io.keychain.available), EXIT.auth);
   const provider = createProvider(providerName, {
     apiKey: resolved.key,
-    ...(timeoutMs === undefined ? {} : { timeoutMs }),
-    ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
+    timeoutMs,
+    fetch: deps.fetch,
   });
   const result = await provider.evaluate(request);
 
@@ -166,7 +171,7 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
     try {
       await io.writeFile(path, render(formatForFile(path, format)));
     } catch (error) {
-      throw usageError(`cannot write file (${path}): ${error instanceof Error ? error.message : String(error)}`);
+      throw usageError(`cannot write file (${path}): ${errorMessage(error)}`);
     }
   }
 }
