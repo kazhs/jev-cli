@@ -109,12 +109,11 @@ export function parseInlineQuestion(type: QuestionType, arg: string): [string, Q
 }
 
 export type QuestionFile = {
-  model?: string;
   state?: Record<string, StateValueType>;
   questions: Record<string, Question>;
 };
 
-const FILE_KEYS = ['model', 'state', 'questions'];
+const FILE_KEYS = ['state', 'questions'];
 
 export function parseQuestionFile(text: string, path: string): QuestionFile {
   let doc: unknown;
@@ -129,10 +128,6 @@ export function parseQuestionFile(text: string, path: string): QuestionFile {
   if (unknownKeys.length > 0) throw usageError(`${path}: unknown key(s): ${unknownKeys.join(', ')} (allowed: ${FILE_KEYS.join(' / ')})`);
 
   const result: QuestionFile = { questions: {} };
-  if (doc.model !== undefined) {
-    if (!isNonEmptyString(doc.model)) throw usageError(`${path}: model is empty`);
-    result.model = doc.model;
-  }
   if (doc.state !== undefined) {
     if (!isRecord(doc.state)) throw usageError(`${path}: state must be an object mapping key to text | json`);
     const state: [string, StateValueType][] = [];
