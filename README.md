@@ -23,15 +23,17 @@ Requires Node.js 22 or later.
 npm install -g jev-cli
 ```
 
-From source:
+From source, into `~/.local/bin`:
 
 ```sh
 git clone https://github.com/kazhs/jev-cli.git
 cd jev-cli
 pnpm install
-pnpm build
-node dist/cli.js --help
+pnpm run install-local     # builds, packs, and installs with npm --prefix ~/.local
+jev --help
 ```
+
+The installed copy lives in `~/.local/lib/node_modules/jev-cli` and does not depend on the clone, so you can move or delete the clone afterwards. Run `pnpm run install-local` again to update it, and `pnpm run uninstall-local` to remove it. Set `PREFIX` to install somewhere else (`PREFIX=/opt/jev pnpm run install-local` puts the command in `/opt/jev/bin`).
 
 ## Authentication
 

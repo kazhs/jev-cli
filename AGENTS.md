@@ -42,6 +42,7 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。stateと型�
 - テスト: `pnpm test`
 - 型チェック: `pnpm typecheck`
 - ビルド: `pnpm build`
+- `~/.local/bin`へのインストール: `pnpm run install-local` (外すのは`pnpm run uninstall-local`)。入れたものはrepoから独立しているので、コードを変えたら入れ直さないと反映されない
 - 作業を終える前に`pnpm typecheck && pnpm test`を通す
 - これからやること (チケット) はGitHub Issuesで管理する。`docs/`にtodoやチケットのファイルを置かない
 - ブランチは`feature/` / `fix/`で切り、mainへはPRで入れる
