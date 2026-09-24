@@ -9,7 +9,9 @@ import {
   resolveApiKey,
 } from '../credentials/resolve.js';
 import type { Io } from '../io/node-io.js';
-import { PROVIDER_KEYS, parseProviderName } from '../providers/index.js';
+import { DEFAULT_PROVIDER, PROVIDER_KEYS, parseProviderName } from '../providers/index.js';
+import type { KeySpec } from '../credentials/resolve.js';
+import { errorMessage } from '../shared.js';
 
 export const AUTH_HELP = `usage: jev auth <set|status|delete> [--provider <name>]
 
@@ -31,9 +33,9 @@ export const credentialContext = (io: Io): CredentialContext => ({
   warn: (message) => io.writeStderr(`jev: warning: ${message}\n`),
 });
 
-function requireKeychain(io: Io): void {
+function requireKeychain(io: Io, spec: KeySpec): void {
   if (!io.keychain.available) {
-    throw usageError(`the Keychain is only available on macOS; use ${PROVIDER_KEYS.vercel.envName} or ${fileEnvName(PROVIDER_KEYS.vercel.envName)} instead`);
+    throw usageError(`the Keychain is only available on macOS; use ${spec.envName} or ${fileEnvName(spec.envName)} instead`);
   }
 }
 
@@ -47,7 +49,7 @@ export async function runAuth(argv: string[], io: Io): Promise<void> {
       allowPositionals: true,
     });
   } catch (error) {
-    throw usageError(error instanceof Error ? error.message : String(error));
+    throw usageError(errorMessage(error));
   }
   const { values, positionals } = parsed;
   const [action, ...rest] = positionals;
@@ -57,12 +59,12 @@ export async function runAuth(argv: string[], io: Io): Promise<void> {
   }
   if (rest.length > 0) throw usageError(`unexpected arguments: ${rest.join(' ')}`);
 
-  const provider = parseProviderName(values.provider ?? 'vercel');
+  const provider = parseProviderName(values.provider ?? DEFAULT_PROVIDER);
   const spec = PROVIDER_KEYS[provider];
 
   switch (action) {
     case 'set': {
-      requireKeychain(io);
+      requireKeychain(io, spec);
       // security が端末でキーを聞くので、端末が無いと入力できない
       if (!io.stdinIsTTY) throw usageError("'jev auth set' needs a terminal to prompt for the key");
       await io.keychain.add(KEYCHAIN_SERVICE, spec.account);
@@ -85,7 +87,7 @@ export async function runAuth(argv: string[], io: Io): Promise<void> {
       return;
     }
     case 'delete': {
-      requireKeychain(io);
+      requireKeychain(io, spec);
       const removed = await io.keychain.remove(KEYCHAIN_SERVICE, spec.account);
       io.writeStdout(removed
         ? `removed from macOS Keychain (service ${KEYCHAIN_SERVICE}, account ${spec.account})\n`

@@ -63,6 +63,7 @@ describe('buildState', () => {
     ['stdinが2つ', ['a=-', 'b=-'], undefined],
     ['宣言キーの不足', ['a=1'], { a: 'text', b: 'text' }],
     ['宣言外のキー', ['a=1', 'c=2'], { a: 'text' }],
+    ['宣言外の constructor', ['a=1', 'constructor=hello'], { a: 'text' }],
     ['宣言があるのにキー無し', ['text'], { a: 'text' }],
     ['JSONとして読めない', ['a=@bad.json'], undefined],
     ['ファイルが無い', ['a=@none.txt'], undefined],
