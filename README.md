@@ -35,10 +35,33 @@ node dist/cli.js --help
 
 ## Authentication
 
-Set an [AI Gateway API key](https://vercel.com/docs/ai-gateway) in `AI_GATEWAY_API_KEY`. The key is read only from the environment. It is never accepted as a flag.
+`jev` needs an [AI Gateway API key](https://vercel.com/docs/ai-gateway). It looks for the key in this order and uses the first one it finds:
+
+1. `AI_GATEWAY_API_KEY` — the key itself
+2. `AI_GATEWAY_API_KEY_FILE` — the path to a file that contains the key. Surrounding whitespace is ignored. `jev` warns if other users can read or write the file
+3. The macOS Keychain (service `jev-cli`, account `vercel`)
+
+The key is never accepted as a flag or an argument, because arguments are visible in the process list.
+
+### macOS Keychain
 
 ```sh
-export AI_GATEWAY_API_KEY=...
+jev auth set      # prompts for the key and saves it to the Keychain
+jev auth status   # shows where the key would be read from, never the key itself
+jev auth delete   # removes the key from the Keychain
+```
+
+`jev auth set` needs a terminal: the key is typed at a prompt from the `security` command.
+
+### Key file
+
+Useful on Linux or in CI:
+
+```sh
+mkdir -p ~/.config/jev
+install -m 600 /dev/null ~/.config/jev/ai-gateway-key   # create an empty file readable only by you
+$EDITOR ~/.config/jev/ai-gateway-key                   # paste the key
+export AI_GATEWAY_API_KEY_FILE=~/.config/jev/ai-gateway-key
 ```
 
 ## State
@@ -183,7 +206,7 @@ JSON output has this shape:
 | 0 | Success |
 | 1 | API error (HTTP error, non-JSON response, timeout, network failure) |
 | 2 | Usage error (flags, question file, or state) |
-| 3 | Authentication (key not set, HTTP 401 / 403) |
+| 3 | Authentication (no key found, unreadable or empty key file, Keychain failure, HTTP 401 / 403) |
 
 ## Development
 

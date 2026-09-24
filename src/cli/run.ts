@@ -1,16 +1,19 @@
 import { parseArgs } from 'node:util';
+import { missingKeyMessage, resolveApiKey } from '../credentials/resolve.js';
 import { CliError, EXIT, type ExitCode, usageError } from '../errors.js';
 import type { Io } from '../io/node-io.js';
 import { OUTPUT_FORMATS, type OutputFormat, formatRaw, formatResult } from '../output/format.js';
-import { createProvider } from '../providers/index.js';
+import { PROVIDER_KEYS, createProvider, parseProviderName } from '../providers/index.js';
 import type { EvaluateRequest, Question } from '../providers/types.js';
 import { mergeQuestions, parseInlineQuestion, parseQuestionFile, type QuestionFile } from '../request/questions.js';
 import { buildState, parseStateArg } from '../request/state.js';
+import { credentialContext, runAuth } from './auth.js';
 
 export const DEFAULT_MODEL = 'typesafe-ai/jev';
 export const DEFAULT_PROVIDER = 'vercel';
 
 export const HELP = `usage: jev [options]
+       jev auth <set|status|delete>
 
 Send state and questions to TypeSafe AI's Jev, and print the formatted answer.
 
@@ -38,8 +41,10 @@ other:
   -h, --help
   -v, --version
 
-environment variables:
-  AI_GATEWAY_API_KEY        API key used when provider is vercel
+API key (provider vercel), looked up in this order:
+  AI_GATEWAY_API_KEY        The key itself
+  AI_GATEWAY_API_KEY_FILE   Path to a file that contains the key
+  macOS Keychain            Saved with 'jev auth set' (see 'jev auth --help')
 
 exit codes: 0 ok / 1 API error / 2 usage error / 3 auth
 `;
@@ -92,6 +97,10 @@ export type RunDeps = {
 
 async function execute(argv: string[], deps: RunDeps): Promise<void> {
   const { io } = deps;
+  if (argv[0] === 'auth') {
+    await runAuth(argv.slice(1), io);
+    return;
+  }
   let parsed;
   try {
     parsed = parseArgs({ args: argv, options: OPTIONS, strict: true, allowPositionals: false });
@@ -111,6 +120,7 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
 
   const format = parseFormat(values.format);
   const timeoutMs = parseTimeout(values.timeout);
+  const providerName = parseProviderName(values.provider ?? DEFAULT_PROVIDER);
 
   let file: QuestionFile = { questions: {} };
   if (values.file !== undefined) {
@@ -138,8 +148,11 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
     return;
   }
 
-  const provider = createProvider(values.provider ?? DEFAULT_PROVIDER, {
-    env: io.env,
+  const keySpec = PROVIDER_KEYS[providerName];
+  const resolved = await resolveApiKey(keySpec, credentialContext(io));
+  if (resolved === undefined) throw new CliError(missingKeyMessage(keySpec, io.keychain.available), EXIT.auth);
+  const provider = createProvider(providerName, {
+    apiKey: resolved.key,
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
     ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
   });
@@ -165,7 +178,9 @@ export async function run(argv: string[], deps: RunDeps): Promise<ExitCode> {
   } catch (error) {
     if (error instanceof CliError) {
       deps.io.writeStderr(`jev: ${error.message}\n`);
-      if (error.exitCode === EXIT.usage) deps.io.writeStderr("Run 'jev --help' for usage.\n");
+      if (error.exitCode === EXIT.usage) {
+        deps.io.writeStderr(`Run '${argv[0] === 'auth' ? 'jev auth --help' : 'jev --help'}' for usage.\n`);
+      }
       return error.exitCode;
     }
     throw error;

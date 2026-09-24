@@ -55,10 +55,18 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
 ### プロバイダ
 
 - プロバイダを差し替えられるよう抽象化する。MVPではVercel AI Gatewayだけを実装する
-- キーはプロバイダごとの環境変数から読む。名前にサービス名 (VERCEL) は含めない
+- キーはプロバイダごとに分けて持つ。環境変数の名前にサービス名 (VERCEL) は含めない
   - Vercel: `AI_GATEWAY_API_KEY`
   - TypeSafe直 (MVPの後): `TYPESAFE_API_KEY`
-- キーはフラグでは受け付けない
+- キーは次の順に探し、最初に見つかったものを使う
+  1. 環境変数 (`AI_GATEWAY_API_KEY`)
+  2. `<環境変数>_FILE`で指定したファイル (`AI_GATEWAY_API_KEY_FILE`)。前後の空白を落として使う。所有者以外が読めるか書ける権限なら警告を出す (止めはしない)。読めないときや空のときのエラーには、パスを出さない (パスの代わりにキーそのものが入っていることがあるため)
+  3. macOSのKeychain (service `jev-cli`、account = プロバイダ名)。macOS以外では探さない
+- キーはフラグでもコマンドの引数でも受け付けない
+- `jev auth`で、Keychainに入れたキーを管理する
+  - `set`: Keychainに保存する。キーは`security`コマンドが端末で聞く (引数で渡すと、プロセス一覧からキーが見えるため)。端末が無ければ使い方の誤りにする
+  - `status`: キーをどこから読むかを出す。キーの値は出さない。見つからなければ認証エラー
+  - `delete`: Keychainから消す
 - Vercelのエンドポイントは`POST https://ai-gateway.vercel.sh/v1/evaluate`、認証は`Authorization: Bearer $AI_GATEWAY_API_KEY` ([Vercel changelog](https://vercel.com/changelog/ai-gateway-now-supports-typesafe-clients-and-http-api-for-jev))
 - 質問の型と応答の形 ([Vercel KB](https://vercel.com/kb/guide/typesafe-jev-and-ai-sdk))
   - `boolean`: `criteria`は`true` / `false`の説明で、省略できる。応答は`probability`
@@ -84,7 +92,7 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
 | 0 | 正常 |
 | 1 | APIエラー (HTTPエラー・JSONでない応答・timeout) |
 | 2 | 使い方の誤り (フラグ・YAML・stateの不整合) |
-| 3 | 認証 (キー未設定・401/403) |
+| 3 | 認証 (キー未設定・キーファイルが読めない / 空・Keychainの操作の失敗・401/403) |
 
 ## MVPの後に回すもの
 

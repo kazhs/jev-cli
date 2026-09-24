@@ -1,11 +1,44 @@
 import { describe, expect, it } from 'vitest';
+import type { Keychain } from '../credentials/resolve.js';
 import type { Io } from '../io/node-io.js';
 import { SAMPLE_RESPONSE } from '../providers/fixtures.js';
 import { run } from './run.js';
 
 type FakeIo = Io & { stdout: string; stderr: string; written: Record<string, string> };
 
-const fakeIo = (options: { files?: Record<string, string>; stdin?: string; tty?: boolean; env?: Record<string, string> } = {}): FakeIo => {
+type FakeKeychain = Keychain & { items: Record<string, string>; added: string[] };
+
+const fakeKeychain = (items: Record<string, string> = {}, available = true): FakeKeychain => {
+  const keychain: FakeKeychain = {
+    available,
+    items,
+    added: [],
+    find: async (service, account) => keychain.items[`${service}/${account}`],
+    add: async (service, account) => {
+      keychain.added.push(`${service}/${account}`);
+      keychain.items[`${service}/${account}`] = 'prompted-key';
+    },
+    remove: async (service, account) => {
+      const id = `${service}/${account}`;
+      if (!(id in keychain.items)) return false;
+      delete keychain.items[id];
+      return true;
+    },
+  };
+  return keychain;
+};
+
+type FakeIoOptions = {
+  files?: Record<string, string>;
+  modes?: Record<string, number>;
+  stdin?: string;
+  tty?: boolean;
+  stdinTty?: boolean;
+  env?: Record<string, string>;
+  keychain?: Keychain;
+};
+
+const fakeIo = (options: FakeIoOptions = {}): FakeIo => {
   const io: FakeIo = {
     stdout: '',
     stderr: '',
@@ -25,15 +58,19 @@ const fakeIo = (options: { files?: Record<string, string>; stdin?: string; tty?:
     writeFile: async (path, text) => {
       io.written[path] = text;
     },
+    fileMode: async (path) => options.modes?.[path],
     stdoutIsTTY: options.tty ?? false,
+    stdinIsTTY: options.stdinTty ?? false,
     env: options.env ?? { AI_GATEWAY_API_KEY: 'test-key' },
+    keychain: options.keychain ?? fakeKeychain({}, false),
   };
   return io;
 };
 
-const okFetch = (bodies: unknown[] = []) =>
+const okFetch = (bodies: unknown[] = [], auth: string[] = []) =>
   (async (_url: string | URL | Request, init?: RequestInit) => {
     bodies.push(JSON.parse(String(init?.body)));
+    auth.push(new Headers(init?.headers).get('authorization') ?? '');
     return new Response(JSON.stringify(SAMPLE_RESPONSE), { status: 200 });
   }) as typeof fetch;
 
@@ -123,5 +160,100 @@ describe('run', () => {
     const io = fakeIo();
     expect(await run(['--version'], { io, version: '1.2.3' })).toBe(0);
     expect(io.stdout).toBe('1.2.3\n');
+  });
+
+  it('キーは 環境変数 > _FILE > Keychain の順で探す', async () => {
+    const keychain = fakeKeychain({ 'jev-cli/vercel': 'keychain-key' });
+    const files = { '/k': 'file-key\n' };
+    const cases: [Record<string, string>, string][] = [
+      [{ AI_GATEWAY_API_KEY: 'env-key', AI_GATEWAY_API_KEY_FILE: '/k' }, 'Bearer env-key'],
+      [{ AI_GATEWAY_API_KEY_FILE: '/k' }, 'Bearer file-key'],
+      [{}, 'Bearer keychain-key'],
+    ];
+    for (const [env, expected] of cases) {
+      const auth: string[] = [];
+      const io = fakeIo({ env, files, keychain, modes: { '/k': 0o100600 } });
+      expect(await run(['-s', 'x', ...QUESTIONS], { io, version: '0.0.0', fetch: okFetch([], auth) })).toBe(0);
+      expect(auth).toEqual([expected]);
+      expect(io.stderr).toBe('');
+    }
+  });
+
+  it('他人が読めるキーファイルは警告するが止めない', async () => {
+    const io = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: '/k' }, files: { '/k': 'k' }, modes: { '/k': 0o100644 } });
+    expect(await run(['-s', 'x', ...QUESTIONS], { io, version: '0.0.0', fetch: okFetch() })).toBe(0);
+    expect(io.stderr).toContain('accessible by other users');
+    expect(io.stderr).toContain("chmod 600 /k");
+    expect(io.stderr).not.toContain('k\n');
+  });
+
+  it('キーファイルのエラーにパスを出さない (キーそのものが入っていることがある)', async () => {
+    const io = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: 'sk-secret-value' } });
+    expect(await run(['-s', 'x', ...QUESTIONS], { io, version: '0.0.0', fetch: okFetch() })).toBe(3);
+    expect(io.stderr).toContain('AI_GATEWAY_API_KEY_FILE');
+    expect(io.stderr).not.toContain('sk-secret-value');
+  });
+
+  it('キーファイルが読めない・空なら exit 3', async () => {
+    const missing = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: '/none' } });
+    expect(await run(['-s', 'x', ...QUESTIONS], { io: missing, version: '0.0.0', fetch: okFetch() })).toBe(3);
+    const empty = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: '/k' }, files: { '/k': '\n' } });
+    expect(await run(['-s', 'x', ...QUESTIONS], { io: empty, version: '0.0.0', fetch: okFetch() })).toBe(3);
+  });
+});
+
+describe('jev auth', () => {
+  it('status はキーの出どころだけを出し、値は出さない', async () => {
+    const io = fakeIo({ env: {}, keychain: fakeKeychain({ 'jev-cli/vercel': 'secret-value' }) });
+    expect(await run(['auth', 'status'], { io, version: '0.0.0' })).toBe(0);
+    expect(io.stdout).toBe('vercel: macOS Keychain (service jev-cli, account vercel)\n');
+    expect(io.stdout + io.stderr).not.toContain('secret-value');
+  });
+
+  it('status でキーが無ければ exit 3', async () => {
+    const io = fakeIo({ env: {}, keychain: fakeKeychain() });
+    expect(await run(['auth', 'status'], { io, version: '0.0.0' })).toBe(3);
+    expect(io.stderr).toContain("jev auth set");
+  });
+
+  it('set は端末があるときだけ Keychain に保存する', async () => {
+    const keychain = fakeKeychain();
+    const noTty = fakeIo({ keychain });
+    expect(await run(['auth', 'set'], { io: noTty, version: '0.0.0' })).toBe(2);
+    expect(keychain.added).toEqual([]);
+
+    const io = fakeIo({ env: {}, keychain, stdinTty: true });
+    expect(await run(['auth', 'set'], { io, version: '0.0.0' })).toBe(0);
+    expect(keychain.added).toEqual(['jev-cli/vercel']);
+  });
+
+  it('set で環境変数やキーファイルも設定されていれば、そちらが優先されると警告する', async () => {
+    const io = fakeIo({ env: { AI_GATEWAY_API_KEY: 'x' }, keychain: fakeKeychain(), stdinTty: true });
+    expect(await run(['auth', 'set'], { io, version: '0.0.0' })).toBe(0);
+    expect(io.stderr).toContain('AI_GATEWAY_API_KEY is set and takes precedence');
+
+    const fileIo = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: '/k' }, keychain: fakeKeychain(), stdinTty: true });
+    expect(await run(['auth', 'set'], { io: fileIo, version: '0.0.0' })).toBe(0);
+    expect(fileIo.stderr).toContain('AI_GATEWAY_API_KEY_FILE is set and takes precedence');
+  });
+
+  it('delete は Keychain から消す', async () => {
+    const keychain = fakeKeychain({ 'jev-cli/vercel': 'k' });
+    const io = fakeIo({ keychain });
+    expect(await run(['auth', 'delete'], { io, version: '0.0.0' })).toBe(0);
+    expect(keychain.items).toEqual({});
+    expect(await run(['auth', 'delete'], { io, version: '0.0.0' })).toBe(0);
+    expect(io.stdout).toContain('nothing to remove');
+  });
+
+  it('Keychain の無い環境で set / delete は exit 2', async () => {
+    const io = fakeIo({ keychain: fakeKeychain({}, false), stdinTty: true });
+    expect(await run(['auth', 'set'], { io, version: '0.0.0' })).toBe(2);
+    expect(await run(['auth', 'delete'], { io, version: '0.0.0' })).toBe(2);
+  });
+
+  it('未知のサブコマンドは exit 2', async () => {
+    const io = fakeIo();
+    expect(await run(['auth', 'login'], { io, version: '0.0.0' })).toBe(2);
   });
 });
