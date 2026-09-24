@@ -3,7 +3,7 @@ import type { Answer, EvaluateResult, Question } from '../providers/types.js';
 export type OutputFormat = 'text' | 'json' | 'md';
 export const OUTPUT_FORMATS: readonly OutputFormat[] = ['text', 'json', 'md'];
 
-const MISSING = '未取得';
+const MISSING = 'n/a';
 
 const percent = (value: number): string => `${(value * 100).toFixed(1)}%`;
 
@@ -31,7 +31,7 @@ const metaLines = (result: EvaluateResult): [string, string][] => {
     value === undefined ? MISSING : `${value}${unit}`;
   return [
     ['provider', `${meta.provider} / ${orMissing(meta.model)}`],
-    ['elapsed', `${meta.elapsedMs.toFixed(0)}ms (手元計測) / provider ${orMissing(meta.providerMs, 'ms')}`],
+    ['elapsed', `${meta.elapsedMs.toFixed(0)}ms (local) / provider ${orMissing(meta.providerMs, 'ms')}`],
     ['tokens', `input ${orMissing(meta.inputTokens)} / output ${orMissing(meta.outputTokens)}`],
     ['marketCost', orMissing(meta.marketCost)],
     ['generationId', orMissing(meta.generationId)],

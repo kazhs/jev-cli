@@ -75,7 +75,7 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
   - choice: `choice`、各選択肢の確率、`confidence`
   - boolean: 確率。Jevはconfidenceを返さないので出さない (vaultの実測でも付いていなかった)
   - score: `score`と各段階の確率
-- 応答に無い値は「未取得」と出す。jsonでは、取れなかった回答をキーごと落とさず`null`にする
+- 応答に無い値は`n/a`と出す。jsonでは、取れなかった回答をキーごと落とさず`null`にする
 
 ### 終了コード
 

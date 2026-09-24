@@ -25,7 +25,7 @@ function parseSource(value: string): StateSource {
   if (value.startsWith('@@')) return { kind: 'literal', text: value.slice(1) };
   if (value.startsWith('@')) {
     const path = value.slice(1);
-    if (path === '') throw usageError('--state の @ の後にファイルのパスが無い');
+    if (path === '') throw usageError('--state: no file path after @');
     return { kind: 'file', path };
   }
   return { kind: 'literal', text: value };
@@ -57,7 +57,7 @@ async function loadValue(arg: StateArg, type: StateValueType, reader: InputReade
       text = await reader.readFile(source.path);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      throw usageError(`${describe(arg)}: ファイルを読めない (${source.path}): ${message}`);
+      throw usageError(`${describe(arg)}: cannot read file (${source.path}): ${message}`);
     }
   }
   // ファイル・stdinの末尾の改行はエディタやechoが足したもので、評価させたい内容ではない
@@ -67,7 +67,7 @@ async function loadValue(arg: StateArg, type: StateValueType, reader: InputReade
     return JSON.parse(text) as JsonValue;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw usageError(`${describe(arg)}: JSONとして読めない: ${message}`);
+    throw usageError(`${describe(arg)}: cannot parse as JSON: ${message}`);
   }
 }
 
@@ -77,30 +77,30 @@ export async function buildState(
   reader: InputReader,
   declared?: Record<string, StateValueType>,
 ): Promise<JsonValue> {
-  if (args.length === 0) throw usageError('--state が無い');
+  if (args.length === 0) throw usageError('--state is required');
   if (args.filter((arg) => arg.source.kind === 'stdin').length > 1) {
-    throw usageError('stdin (-) から読める --state は1つだけ');
+    throw usageError('only one --state can read from stdin (-)');
   }
 
   const keyed = args.filter((arg): arg is KeyedStateArg => arg.key !== undefined);
   if (keyed.length < args.length) {
     const [only, ...rest] = args;
-    if (only === undefined || rest.length > 0) throw usageError('--state を複数渡すときは、すべて key=値 の形にする');
+    if (only === undefined || rest.length > 0) throw usageError('when passing multiple --state, all must be key=value');
     if (declared !== undefined) {
-      throw usageError(`質問ファイルがstateのキーを宣言している (${Object.keys(declared).join(', ')})。--state key=値 で渡す`);
+      throw usageError(`the question file declares state keys (${Object.keys(declared).join(', ')}); pass --state key=value`);
     }
     return loadValue(only, inferType(only.source), reader);
   }
 
   const keys = keyed.map((arg) => arg.key);
   const duplicated = keys.filter((key, index) => keys.indexOf(key) !== index);
-  if (duplicated.length > 0) throw usageError(`--state のキーが重複している: ${[...new Set(duplicated)].join(', ')}`);
+  if (duplicated.length > 0) throw usageError(`duplicate --state keys: ${[...new Set(duplicated)].join(', ')}`);
 
   if (declared !== undefined) {
     const missing = Object.keys(declared).filter((key) => !keys.includes(key));
     const extra = keys.filter((key) => !(key in declared));
-    if (missing.length > 0) throw usageError(`質問ファイルが宣言したstateのキーが渡されていない: ${missing.join(', ')}`);
-    if (extra.length > 0) throw usageError(`質問ファイルが宣言していないstateのキー: ${extra.join(', ')}`);
+    if (missing.length > 0) throw usageError(`missing state key(s) declared by the question file: ${missing.join(', ')}`);
+    if (extra.length > 0) throw usageError(`state key(s) not declared by the question file: ${extra.join(', ')}`);
   }
 
   const entries: [string, JsonValue][] = [];

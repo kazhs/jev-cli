@@ -12,36 +12,36 @@ export const DEFAULT_PROVIDER = 'vercel';
 
 export const HELP = `usage: jev [options]
 
-TypeSafe AIのJevにstateと質問を渡し、回答を整形して出す。
+Send state and questions to TypeSafe AI's Jev, and print the formatted answer.
 
 state:
-  -s, --state <value>       評価させる入力。値は テキスト / @path / - (stdin)。@で始まるテキストは@@で書く
-                            key=<value> を複数並べると {key: ...} のJSONにまとめる
-                            .jsonのファイルはJSONとして、それ以外はテキストとして読む
+  -s, --state <value>       Input to evaluate. Value is text / @path / - (stdin). Text starting with @ is written as @@
+                            Multiple key=<value> pairs are combined into a JSON object {key: ...}
+                            .json files are read as JSON, everything else as text
 
-質問:
-  -f, --file <path>         質問ファイル (YAML)
-      --bool <name=質問文[|true:説明,false:説明]>
-      --choice <name=質問文|a:説明,b:説明>
-      --score <name=質問文|低,中,高>
+questions:
+  -f, --file <path>         Question file (YAML)
+      --bool <name=instructions[|true:description,false:description]>
+      --choice <name=instructions|a:description,b:description>
+      --score <name=instructions|low,mid,high>
 
-出力:
-      --format <text|json|md>  既定は、標準出力が端末ならtext、それ以外ならjson
-  -o, --output <path>       標準出力に加えてファイルにも書く。形式は拡張子 (.json / .md) で決め、それ以外は--formatに従う
-      --raw                 APIの応答をそのまま出す
-      --dry-run             組み立てたリクエストを出すだけで、APIは呼ばない
+output:
+      --format <text|json|md>  Default: text if stdout is a TTY, json otherwise
+  -o, --output <path>       Also write to a file in addition to stdout. Format is chosen by extension (.json / .md), otherwise follows --format
+      --raw                 Print the API response as-is
+      --dry-run             Print the assembled request without calling the API
 
-その他:
-      --model <id>          既定は ${DEFAULT_MODEL}
-      --provider <name>     既定は ${DEFAULT_PROVIDER}
-      --timeout <ms>        既定は30000
+other:
+      --model <id>          Default: ${DEFAULT_MODEL}
+      --provider <name>     Default: ${DEFAULT_PROVIDER}
+      --timeout <ms>        Default: 30000
   -h, --help
   -v, --version
 
-環境変数:
-  AI_GATEWAY_API_KEY        providerがvercelのときのAPIキー
+environment variables:
+  AI_GATEWAY_API_KEY        API key used when provider is vercel
 
-終了コード: 0 正常 / 1 APIエラー / 2 使い方の誤り / 3 認証
+exit codes: 0 ok / 1 API error / 2 usage error / 3 auth
 `;
 
 const OPTIONS = {
@@ -66,7 +66,7 @@ const isOutputFormat = (value: string): value is OutputFormat =>
 
 function parseFormat(value: string | undefined): OutputFormat | undefined {
   if (value === undefined) return undefined;
-  if (!isOutputFormat(value)) throw usageError(`--format は ${OUTPUT_FORMATS.join(' / ')} のどれか (${value})`);
+  if (!isOutputFormat(value)) throw usageError(`--format must be one of ${OUTPUT_FORMATS.join(' / ')} (${value})`);
   return value;
 }
 
@@ -80,7 +80,7 @@ function formatForFile(path: string, explicit: OutputFormat | undefined): Output
 function parseTimeout(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const ms = Number(value);
-  if (!Number.isInteger(ms) || ms <= 0) throw usageError(`--timeout は正の整数 (ms) にする (${value})`);
+  if (!Number.isInteger(ms) || ms <= 0) throw usageError(`--timeout must be a positive integer (ms) (${value})`);
   return ms;
 }
 
@@ -119,7 +119,7 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
     try {
       text = await io.readFile(path);
     } catch (error) {
-      throw usageError(`質問ファイルを読めない (${path}): ${error instanceof Error ? error.message : String(error)}`);
+      throw usageError(`cannot read question file (${path}): ${error instanceof Error ? error.message : String(error)}`);
     }
     file = parseQuestionFile(text, path);
   }
@@ -153,7 +153,7 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
     try {
       await io.writeFile(path, render(formatForFile(path, format)));
     } catch (error) {
-      throw usageError(`ファイルに書けない (${path}): ${error instanceof Error ? error.message : String(error)}`);
+      throw usageError(`cannot write file (${path}): ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
@@ -165,7 +165,7 @@ export async function run(argv: string[], deps: RunDeps): Promise<ExitCode> {
   } catch (error) {
     if (error instanceof CliError) {
       deps.io.writeStderr(`jev: ${error.message}\n`);
-      if (error.exitCode === EXIT.usage) deps.io.writeStderr('jev --help で使い方を出す\n');
+      if (error.exitCode === EXIT.usage) deps.io.writeStderr("Run 'jev --help' for usage.\n");
       return error.exitCode;
     }
     throw error;

@@ -116,13 +116,13 @@ export function createVercelProvider(options: VercelProviderOptions): Provider {
         text = await res.text();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new CliError(`リクエストに失敗した: ${message}`, EXIT.api);
+        throw new CliError(`request failed: ${message}`, EXIT.api);
       }
       // 手元で測るのは送信から応答本文の受信完了まで (ネットワーク往復を含む)
       const elapsedMs = now() - startedAt;
 
       if (res.status === 401 || res.status === 403) {
-        throw new CliError(`認証に失敗した (HTTP ${res.status})\n${text}`, EXIT.auth);
+        throw new CliError(`authentication failed (HTTP ${res.status})\n${text}`, EXIT.auth);
       }
       if (!res.ok) throw new CliError(`HTTP ${res.status}\n${text}`, EXIT.api);
 
@@ -130,7 +130,7 @@ export function createVercelProvider(options: VercelProviderOptions): Provider {
       try {
         body = JSON.parse(text);
       } catch {
-        throw new CliError(`JSONでない応答\n${text}`, EXIT.api);
+        throw new CliError(`response is not JSON\n${text}`, EXIT.api);
       }
       return parseResponse(body, Object.keys(request.questions), elapsedMs);
     },

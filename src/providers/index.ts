@@ -16,11 +16,11 @@ export type ProviderContext = {
 
 // キーはプロバイダごとの環境変数からだけ読む (フラグでは受けない)
 export function createProvider(name: string, context: ProviderContext): Provider {
-  if (!isProviderName(name)) throw usageError(`--provider は ${PROVIDER_NAMES.join(' / ')} のどれか (${name})`);
+  if (!isProviderName(name)) throw usageError(`--provider must be one of ${PROVIDER_NAMES.join(' / ')} (${name})`);
   switch (name) {
     case 'vercel': {
       const apiKey = context.env[VERCEL_API_KEY_ENV];
-      if (apiKey === undefined || apiKey === '') throw new CliError(`${VERCEL_API_KEY_ENV} が設定されていない`, EXIT.auth);
+      if (apiKey === undefined || apiKey === '') throw new CliError(`${VERCEL_API_KEY_ENV} is not set`, EXIT.auth);
       return createVercelProvider({
         apiKey,
         ...(context.timeoutMs === undefined ? {} : { timeoutMs: context.timeoutMs }),

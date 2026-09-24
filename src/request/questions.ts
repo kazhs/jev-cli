@@ -17,59 +17,59 @@ const isNonEmptyString = (value: unknown): value is string => typeof value === '
 
 function checkName(name: string, where: string): void {
   if (!QUESTION_NAME.test(name)) {
-    throw usageError(`${where}: 質問名 "${name}" は英字か_で始め、英数字・_・-だけで書く`);
+    throw usageError(`${where}: question name "${name}" must start with a letter or _ and contain only letters, digits, _ or -`);
   }
 }
 
 export function validateQuestion(name: string, value: unknown, where: string): Question {
   checkName(name, where);
   const at = `${where}: ${name}`;
-  if (!isRecord(value)) throw usageError(`${at} がオブジェクトでない`);
-  if (!isNonEmptyString(value.instructions)) throw usageError(`${at}.instructions が空`);
+  if (!isRecord(value)) throw usageError(`${at} is not an object`);
+  if (!isNonEmptyString(value.instructions)) throw usageError(`${at}.instructions is empty`);
   const { instructions, criteria } = value;
 
   switch (value.type) {
     case 'boolean': {
       if (criteria === undefined) return { type: 'boolean', instructions };
-      if (!isRecord(criteria)) throw usageError(`${at}.criteria は true / false の説明を持つオブジェクトにする`);
+      if (!isRecord(criteria)) throw usageError(`${at}.criteria must be an object with true / false descriptions`);
       const unknownKeys = Object.keys(criteria).filter((key) => key !== 'true' && key !== 'false');
-      if (unknownKeys.length > 0) throw usageError(`${at}.criteria に使えるキーは true / false だけ: ${unknownKeys.join(', ')}`);
+      if (unknownKeys.length > 0) throw usageError(`${at}.criteria only accepts true / false keys: ${unknownKeys.join(', ')}`);
       const result: { true?: string; false?: string } = {};
       for (const key of ['true', 'false'] as const) {
         const description = criteria[key];
         if (description === undefined) continue;
-        if (!isNonEmptyString(description)) throw usageError(`${at}.criteria.${key} が空`);
+        if (!isNonEmptyString(description)) throw usageError(`${at}.criteria.${key} is empty`);
         result[key] = description;
       }
       return { type: 'boolean', instructions, criteria: result };
     }
     case 'choice': {
-      if (!isRecord(criteria)) throw usageError(`${at}.criteria は 選択肢名 → 説明 のオブジェクトにする`);
+      if (!isRecord(criteria)) throw usageError(`${at}.criteria must be an object mapping option name to description`);
       const entries = Object.entries(criteria);
       if (entries.length < 2 || entries.length > CHOICE_MAX) {
-        throw usageError(`${at}.criteria の選択肢は2〜${CHOICE_MAX}個にする (${entries.length}個)`);
+        throw usageError(`${at}.criteria must have between 2 and ${CHOICE_MAX} options (got ${entries.length})`);
       }
       const result: Record<string, string> = {};
       for (const [option, description] of entries) {
-        if (!isNonEmptyString(description)) throw usageError(`${at}.criteria.${option} の説明が空`);
+        if (!isNonEmptyString(description)) throw usageError(`${at}.criteria.${option} description is empty`);
         result[option] = description;
       }
       return { type: 'choice', instructions, criteria: result };
     }
     case 'score': {
-      if (!Array.isArray(criteria)) throw usageError(`${at}.criteria は段階の説明の配列にする (低い段階から)`);
+      if (!Array.isArray(criteria)) throw usageError(`${at}.criteria must be an array of level descriptions (lowest first)`);
       if (criteria.length < SCORE_MIN || criteria.length > SCORE_MAX) {
-        throw usageError(`${at}.criteria の段階は${SCORE_MIN}〜${SCORE_MAX}個にする (${criteria.length}個)`);
+        throw usageError(`${at}.criteria must have between ${SCORE_MIN} and ${SCORE_MAX} levels (got ${criteria.length})`);
       }
       const levels: string[] = [];
       for (const [index, level] of criteria.entries()) {
-        if (!isNonEmptyString(level)) throw usageError(`${at}.criteria[${index}] が空`);
+        if (!isNonEmptyString(level)) throw usageError(`${at}.criteria[${index}] is empty`);
         levels.push(level);
       }
       return { type: 'score', instructions, criteria: levels };
     }
     default:
-      throw usageError(`${at}.type は boolean / choice / score のどれか (${String(value.type)})`);
+      throw usageError(`${at}.type must be boolean / choice / score (${String(value.type)})`);
   }
 }
 
@@ -79,7 +79,7 @@ export function validateQuestion(name: string, value: unknown, where: string): Q
 export function parseInlineQuestion(type: QuestionType, arg: string): [string, Question] {
   const flag = type === 'boolean' ? '--bool' : `--${type}`;
   const eq = arg.indexOf('=');
-  if (eq <= 0) throw usageError(`${flag}: name="質問文" の形で書く (${arg})`);
+  if (eq <= 0) throw usageError(`${flag}: write it as name="instructions" (${arg})`);
   const name = arg.slice(0, eq);
   const body = arg.slice(eq + 1);
   const bar = body.lastIndexOf('|');
@@ -99,11 +99,11 @@ export function parseInlineQuestion(type: QuestionType, arg: string): [string, Q
       raw = { type, instructions, ...(items.length === 0 ? {} : { criteria: Object.fromEntries(pairs()) }) };
       break;
     case 'choice':
-      if (bar < 0) throw usageError(`${flag} ${name}: 選択肢が無い。"質問文|a:説明,b:説明" の形で書く`);
+      if (bar < 0) throw usageError(`${flag} ${name}: no options given. write it as "instructions|a:description,b:description"`);
       raw = { type, instructions, criteria: Object.fromEntries(pairs()) };
       break;
     case 'score':
-      if (bar < 0) throw usageError(`${flag} ${name}: 段階が無い。"質問文|低,中,高" の形で書く`);
+      if (bar < 0) throw usageError(`${flag} ${name}: no levels given. write it as "instructions|low,mid,high"`);
       raw = { type, instructions, criteria: items };
       break;
   }
@@ -124,27 +124,27 @@ export function parseQuestionFile(text: string, path: string): QuestionFile {
     doc = parseYaml(text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw usageError(`${path}: YAMLとして読めない: ${message}`);
+    throw usageError(`${path}: cannot parse as YAML: ${message}`);
   }
-  if (!isRecord(doc)) throw usageError(`${path}: トップレベルがオブジェクトでない`);
+  if (!isRecord(doc)) throw usageError(`${path}: top level is not an object`);
   const unknownKeys = Object.keys(doc).filter((key) => !FILE_KEYS.includes(key));
-  if (unknownKeys.length > 0) throw usageError(`${path}: 使えないキー: ${unknownKeys.join(', ')} (使えるのは ${FILE_KEYS.join(' / ')})`);
+  if (unknownKeys.length > 0) throw usageError(`${path}: unknown key(s): ${unknownKeys.join(', ')} (allowed: ${FILE_KEYS.join(' / ')})`);
 
   const result: QuestionFile = { questions: {} };
   if (doc.model !== undefined) {
-    if (!isNonEmptyString(doc.model)) throw usageError(`${path}: model が空`);
+    if (!isNonEmptyString(doc.model)) throw usageError(`${path}: model is empty`);
     result.model = doc.model;
   }
   if (doc.state !== undefined) {
-    if (!isRecord(doc.state)) throw usageError(`${path}: state は キー → text | json のオブジェクトにする`);
+    if (!isRecord(doc.state)) throw usageError(`${path}: state must be an object mapping key to text | json`);
     const state: Record<string, StateValueType> = {};
     for (const [key, type] of Object.entries(doc.state)) {
-      if (type !== 'text' && type !== 'json') throw usageError(`${path}: state.${key} は text か json (${String(type)})`);
+      if (type !== 'text' && type !== 'json') throw usageError(`${path}: state.${key} must be text or json (${String(type)})`);
       state[key] = type;
     }
     result.state = state;
   }
-  if (!isRecord(doc.questions)) throw usageError(`${path}: questions が無い`);
+  if (!isRecord(doc.questions)) throw usageError(`${path}: questions is missing`);
   for (const [name, value] of Object.entries(doc.questions)) {
     result.questions[name] = validateQuestion(name, value, path);
   }
@@ -158,9 +158,9 @@ export function mergeQuestions(
 ): Record<string, Question> {
   const merged: Record<string, Question> = { ...fileQuestions };
   for (const [name, question] of inline) {
-    if (name in merged) throw usageError(`質問名が重複している: ${name}`);
+    if (name in merged) throw usageError(`duplicate question name: ${name}`);
     merged[name] = question;
   }
-  if (Object.keys(merged).length === 0) throw usageError('質問が無い (--bool / --choice / --score か -f で渡す)');
+  if (Object.keys(merged).length === 0) throw usageError('no questions given (use --bool / --choice / --score or -f)');
   return merged;
 }
