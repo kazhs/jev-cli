@@ -20,7 +20,8 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。stateと型�
 - `src/request/` — stateの合成と質問の組み立て (inlineフラグ・YAML)。純粋関数で書く
 - `src/providers/` — プロバイダの実装。プロバイダ共通のinterfaceを1つ持ち、プロバイダごとの差 (エンドポイント・型名・キーの環境変数) はこの中に閉じる
 - `src/output/` — 応答の整形 (text / json / md)。純粋関数で書く
-- `src/io/` — ファイル・stdinの読み書き
+- `src/credentials/` — APIキーの探索 (環境変数・キーファイル・Keychain)。キーの値を出力しない
+- `src/io/` — ファイル・stdin・Keychain (macOSの`security`コマンド) の読み書き
 - テストは対象と同じ階層に`*.test.ts`で置く
 - `docs/` — 要件・設計。構成は`docs/README.md`に従う
 
@@ -29,7 +30,7 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。stateと型�
 - 外部仕様 (APIのエンドポイント・リクエストや応答の形・環境変数名) をコードに書くときは、1次ソース (公式docs、または実際の応答) で確かめてから書き、出典のURLをコメントに残す
 - APIの応答は`unknown`として受け、型ガードで絞ってから使う。応答に無いフィールドは取得できなかったものとして扱い (text / mdでは`n/a`、jsonでは`null`)、推測で埋めない
 - ユーザーに見せる文字列 (help・エラー・出力のラベル) は英語で書く。コードコメントは日本語でよい
-- APIキーはフラグで受け付けない。環境変数からだけ読む。キーの値をログ・エラーメッセージ・`--dry-run`の出力に含めない
+- APIキーはフラグでもコマンドの引数でも受け付けない (プロセス一覧から見えるため)。読む先は`src/credentials/`の優先順位に従う。キーの値をログ・エラーメッセージ・`--dry-run`・`jev auth status`の出力に含めない
 - 終了コードの意味は`docs/specs/requirements.md`の表に従う。増やすときは表を先に更新する
 - テストはAPIを実際に呼ばない。`fetch`を差し替えてプロバイダの応答を固定する
 

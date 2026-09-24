@@ -1,4 +1,5 @@
-import { CliError, EXIT, usageError } from '../errors.js';
+import { usageError } from '../errors.js';
+import type { KeySpec } from '../credentials/resolve.js';
 import type { Provider } from './types.js';
 import { VERCEL_API_KEY_ENV, createVercelProvider } from './vercel.js';
 
@@ -8,24 +9,29 @@ export type ProviderName = (typeof PROVIDER_NAMES)[number];
 export const isProviderName = (value: string): value is ProviderName =>
   (PROVIDER_NAMES as readonly string[]).includes(value);
 
+export function parseProviderName(value: string): ProviderName {
+  if (!isProviderName(value)) throw usageError(`--provider must be one of ${PROVIDER_NAMES.join(' / ')} (${value})`);
+  return value;
+}
+
+// キーの環境変数名と Keychain の account はプロバイダごとに分ける (別プロバイダへキーを送らないため)
+export const PROVIDER_KEYS: Record<ProviderName, KeySpec> = {
+  vercel: { envName: VERCEL_API_KEY_ENV, account: 'vercel' },
+};
+
 export type ProviderContext = {
-  env: Record<string, string | undefined>;
+  apiKey: string;
   timeoutMs?: number;
   fetch?: typeof fetch;
 };
 
-// キーはプロバイダごとの環境変数からだけ読む (フラグでは受けない)
-export function createProvider(name: string, context: ProviderContext): Provider {
-  if (!isProviderName(name)) throw usageError(`--provider must be one of ${PROVIDER_NAMES.join(' / ')} (${name})`);
+export function createProvider(name: ProviderName, context: ProviderContext): Provider {
   switch (name) {
-    case 'vercel': {
-      const apiKey = context.env[VERCEL_API_KEY_ENV];
-      if (apiKey === undefined || apiKey === '') throw new CliError(`${VERCEL_API_KEY_ENV} is not set`, EXIT.auth);
+    case 'vercel':
       return createVercelProvider({
-        apiKey,
+        apiKey: context.apiKey,
         ...(context.timeoutMs === undefined ? {} : { timeoutMs: context.timeoutMs }),
         ...(context.fetch === undefined ? {} : { fetch: context.fetch }),
       });
-    }
   }
 }
