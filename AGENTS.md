@@ -22,12 +22,14 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。stateと型�
 - `src/output/` — 応答の整形 (text / json / md)。純粋関数で書く
 - `src/credentials/` — APIキーの探索 (環境変数・キーファイル・Keychain)。キーの値を出力しない
 - `src/io/` — ファイル・stdin・Keychain (macOSの`security`コマンド) の読み書き
+- `src/shared.ts` — 層をまたいで使う小さな関数 (型ガード・エラー文の取り出し)。同じ関数を各ファイルに書き写さず、ここに置く
 - テストは対象と同じ階層に`*.test.ts`で置く
 - `docs/` — 要件・設計。構成は`docs/README.md`に従う
 
 ## コーディング規約
 
 - 外部仕様 (APIのエンドポイント・リクエストや応答の形・環境変数名) をコードに書くときは、1次ソース (公式docs、または実際の応答) で確かめてから書き、出典のURLをコメントに残す
+- ユーザーが名前を決めるキー (質問名・選択肢名・stateのキー) は`constructor`や`__proto__`でも壊れないように扱う。`in`やオブジェクトへの代入ではなく、`Object.hasOwn`・`Map`・`Object.fromEntries`を使う
 - APIの応答は`unknown`として受け、型ガードで絞ってから使う。応答に無いフィールドは取得できなかったものとして扱い (text / mdでは`n/a`、jsonでは`null`)、推測で埋めない
 - ユーザーに見せる文字列 (help・エラー・出力のラベル) は英語で書く。コードコメントは日本語でよい
 - APIキーはフラグでもコマンドの引数でも受け付けない (プロセス一覧から見えるため)。読む先は`src/credentials/`の優先順位に従う。キーの値をログ・エラーメッセージ・`--dry-run`・`jev auth status`の出力に含めない

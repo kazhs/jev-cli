@@ -42,8 +42,26 @@ export function describeSource(source: KeySource): string {
   }
 }
 
+// HTTPヘッダに載せられない文字 (空白・改行・制御文字) を含むと、fetch がキー入りのエラー文を投げる。
+// 送る前に弾き、値は出さない
+const VALID_KEY = /^[\x21-\x7e]+$/;
+
+function checked(resolved: ResolvedKey): ResolvedKey {
+  if (!VALID_KEY.test(resolved.key)) {
+    throw new CliError(`the API key from ${describeSource(resolved.source)} contains whitespace or non-printable characters`, EXIT.auth);
+  }
+  return resolved;
+}
+
+const shellQuote = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
+
 // 優先順位: 環境変数 > <環境変数>_FILE > Keychain。上位で見つかったら下位は見ない
 export async function resolveApiKey(spec: KeySpec, context: CredentialContext): Promise<ResolvedKey | undefined> {
+  const found = await findApiKey(spec, context);
+  return found === undefined ? undefined : checked(found);
+}
+
+async function findApiKey(spec: KeySpec, context: CredentialContext): Promise<ResolvedKey | undefined> {
   const direct = context.env[spec.envName];
   if (direct !== undefined && direct !== '') return { key: direct, source: { kind: 'env', name: spec.envName } };
 
@@ -63,7 +81,7 @@ export async function resolveApiKey(spec: KeySpec, context: CredentialContext): 
     const mode = await context.fileMode(path);
     // 所有者以外が読める (キーが漏れる) か書ける (キーを差し替えられる) ファイルは知らせる。止めはしない
     if (mode !== undefined && (mode & 0o077) !== 0) {
-      context.warn(`${path} is accessible by other users (mode ${(mode & 0o777).toString(8)}); run 'chmod 600 ${path}'`);
+      context.warn(`${path} is accessible by other users (mode ${(mode & 0o777).toString(8)}); run 'chmod 600 ${shellQuote(path)}'`);
     }
     return { key, source: { kind: 'file', name: fileName, path } };
   }

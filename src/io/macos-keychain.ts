@@ -2,6 +2,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { CliError, EXIT } from '../errors.js';
 import type { Keychain } from '../credentials/resolve.js';
+import { errorMessage } from '../shared.js';
 
 // 項目が無いときの security の終了コード (実測)
 const NOT_FOUND = 44;
@@ -10,7 +11,7 @@ type ExecResult = { code: number; stdout: string; stderr: string };
 
 // 終了コードを返せない失敗 (シグナル終了・maxBuffer超過・起動失敗) も認証エラーとして扱う
 const unexpected = (error: unknown): CliError =>
-  new CliError(`keychain access failed: ${error instanceof Error ? error.message : String(error)}`, EXIT.auth);
+  new CliError(`keychain access failed: ${errorMessage(error)}`, EXIT.auth);
 
 const exec = (args: string[]): Promise<ExecResult> =>
   new Promise((resolve, reject) => {

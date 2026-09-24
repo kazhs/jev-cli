@@ -1,6 +1,7 @@
 // --state の解釈とstateの合成
 import { usageError } from '../errors.js';
 import type { JsonValue } from '../providers/types.js';
+import { errorMessage } from '../shared.js';
 
 export type StateValueType = 'text' | 'json';
 
@@ -56,7 +57,7 @@ async function loadValue(arg: StateArg, type: StateValueType, reader: InputReade
     try {
       text = await reader.readFile(source.path);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       throw usageError(`${describe(arg)}: cannot read file (${source.path}): ${message}`);
     }
   }
@@ -66,7 +67,7 @@ async function loadValue(arg: StateArg, type: StateValueType, reader: InputReade
   try {
     return JSON.parse(text) as JsonValue;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     throw usageError(`${describe(arg)}: cannot parse as JSON: ${message}`);
   }
 }
@@ -98,14 +99,15 @@ export async function buildState(
 
   if (declared !== undefined) {
     const missing = Object.keys(declared).filter((key) => !keys.includes(key));
-    const extra = keys.filter((key) => !(key in declared));
+    const extra = keys.filter((key) => !Object.hasOwn(declared, key));
     if (missing.length > 0) throw usageError(`missing state key(s) declared by the question file: ${missing.join(', ')}`);
     if (extra.length > 0) throw usageError(`state key(s) not declared by the question file: ${extra.join(', ')}`);
   }
 
   const entries: [string, JsonValue][] = [];
   for (const arg of keyed) {
-    entries.push([arg.key, await loadValue(arg, declared?.[arg.key] ?? inferType(arg.source), reader)]);
+    const type = declared !== undefined && Object.hasOwn(declared, arg.key) ? declared[arg.key] : undefined;
+    entries.push([arg.key, await loadValue(arg, type ?? inferType(arg.source), reader)]);
   }
   return Object.fromEntries(entries);
 }

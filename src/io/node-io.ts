@@ -34,7 +34,9 @@ export const nodeIo: Io = {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, text, 'utf8');
   },
+  // Windows の mode は ACL を反映せずほぼ常に 0o666 になるので、権限の判定に使わない
   fileMode: async (path) => {
+    if (process.platform === 'win32') return undefined;
     try {
       return (await stat(path)).mode;
     } catch {

@@ -96,3 +96,36 @@ describe('parseAnswer', () => {
     expect(parseAnswer(null)).toBeUndefined();
   });
 });
+
+describe('エラーとメタデータ', () => {
+  it('fetch のエラー文に含まれるキーを伏せる', async () => {
+    const provider = createVercelProvider({
+      apiKey: 'sk-secret-value',
+      fetch: (async () => {
+        throw new TypeError('Headers.append: "Bearer sk-secret-value" is an invalid header value.');
+      }) as typeof fetch,
+    });
+    const error = await provider.evaluate(request).catch((e: unknown) => e);
+    expect(error).toMatchObject({ exitCode: 1 });
+    expect(String((error as Error).message)).not.toContain('sk-secret-value');
+    expect(String((error as Error).message)).toContain('<redacted>');
+  });
+
+  it('試行が複数あれば、最後の試行の所要時間を使う', async () => {
+    const body = {
+      ...SAMPLE_RESPONSE,
+      providerMetadata: {
+        gateway: {
+          routing: {
+            modelAttempts: [
+              { providerAttempts: [{ startTime: 0, endTime: 12 }] },
+              { providerAttempts: [{ startTime: 100, endTime: 150 }, { startTime: 200, endTime: 290 }] },
+            ],
+          },
+        },
+      },
+    };
+    const provider = createVercelProvider({ apiKey: 'k', fetch: fakeFetch(200, JSON.stringify(body)), now: clock() });
+    expect((await provider.evaluate(request)).meta.providerMs).toBe(90);
+  });
+});

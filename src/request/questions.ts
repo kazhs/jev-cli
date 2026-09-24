@@ -4,14 +4,12 @@ import { parse as parseYaml } from 'yaml';
 import { usageError } from '../errors.js';
 import type { Question, QuestionType } from '../providers/types.js';
 import type { StateValueType } from './state.js';
+import { errorMessage, isRecord } from '../shared.js';
 
 const QUESTION_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 const CHOICE_MAX = 255;
 const SCORE_MIN = 2;
 const SCORE_MAX = 10;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
 
@@ -49,12 +47,12 @@ export function validateQuestion(name: string, value: unknown, where: string): Q
       if (entries.length < 2 || entries.length > CHOICE_MAX) {
         throw usageError(`${at}.criteria must have between 2 and ${CHOICE_MAX} options (got ${entries.length})`);
       }
-      const result: Record<string, string> = {};
+      const options: [string, string][] = [];
       for (const [option, description] of entries) {
         if (!isNonEmptyString(description)) throw usageError(`${at}.criteria.${option} description is empty`);
-        result[option] = description;
+        options.push([option, description]);
       }
-      return { type: 'choice', instructions, criteria: result };
+      return { type: 'choice', instructions, criteria: Object.fromEntries(options) };
     }
     case 'score': {
       if (!Array.isArray(criteria)) throw usageError(`${at}.criteria must be an array of level descriptions (lowest first)`);
@@ -123,7 +121,7 @@ export function parseQuestionFile(text: string, path: string): QuestionFile {
   try {
     doc = parseYaml(text);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     throw usageError(`${path}: cannot parse as YAML: ${message}`);
   }
   if (!isRecord(doc)) throw usageError(`${path}: top level is not an object`);
@@ -137,30 +135,31 @@ export function parseQuestionFile(text: string, path: string): QuestionFile {
   }
   if (doc.state !== undefined) {
     if (!isRecord(doc.state)) throw usageError(`${path}: state must be an object mapping key to text | json`);
-    const state: Record<string, StateValueType> = {};
+    const state: [string, StateValueType][] = [];
     for (const [key, type] of Object.entries(doc.state)) {
       if (type !== 'text' && type !== 'json') throw usageError(`${path}: state.${key} must be text or json (${String(type)})`);
-      state[key] = type;
+      state.push([key, type]);
     }
-    result.state = state;
+    result.state = Object.fromEntries(state);
   }
   if (!isRecord(doc.questions)) throw usageError(`${path}: questions is missing`);
-  for (const [name, value] of Object.entries(doc.questions)) {
-    result.questions[name] = validateQuestion(name, value, path);
-  }
+  result.questions = Object.fromEntries(
+    Object.entries(doc.questions).map(([name, value]) => [name, validateQuestion(name, value, path)]),
+  );
   return result;
 }
 
-// 質問ファイルとinlineを合わせる。名前が衝突したらエラー
+// 質問ファイルとinlineを合わせる。名前が衝突したらエラー。
+// 質問名は constructor や __proto__ でもよいので、in や代入 (prototype に触れる) を使わず Map で組む
 export function mergeQuestions(
   fileQuestions: Record<string, Question>,
   inline: [string, Question][],
 ): Record<string, Question> {
-  const merged: Record<string, Question> = { ...fileQuestions };
+  const merged = new Map(Object.entries(fileQuestions));
   for (const [name, question] of inline) {
-    if (name in merged) throw usageError(`duplicate question name: ${name}`);
-    merged[name] = question;
+    if (merged.has(name)) throw usageError(`duplicate question name: ${name}`);
+    merged.set(name, question);
   }
-  if (Object.keys(merged).length === 0) throw usageError('no questions given (use --bool / --choice / --score or -f)');
-  return merged;
+  if (merged.size === 0) throw usageError('no questions given (use --bool / --choice / --score or -f)');
+  return Object.fromEntries(merged);
 }
