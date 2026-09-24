@@ -26,6 +26,9 @@ export type CredentialContext = {
 
 export type KeySpec = { envName: string; account: string };
 
+const isErrnoException = (error: unknown): error is NodeJS.ErrnoException =>
+  error instanceof Error && 'code' in error;
+
 export const fileEnvName = (envName: string): string => `${envName}_FILE`;
 
 export function describeSource(source: KeySource): string {
@@ -51,15 +54,16 @@ export async function resolveApiKey(spec: KeySpec, context: CredentialContext): 
     try {
       text = await context.readFile(path);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new CliError(`cannot read ${fileName} (${path}): ${message}`, EXIT.auth);
+      // パスの代わりにキーそのものが入っていることがあるので、パスもNodeのエラー文 (パスを含む) も出さない
+      const code = isErrnoException(error) && typeof error.code === 'string' ? ` (${error.code})` : '';
+      throw new CliError(`cannot read the file named by ${fileName}${code}`, EXIT.auth);
     }
     const key = text.trim();
-    if (key === '') throw new CliError(`${fileName} (${path}) is empty`, EXIT.auth);
+    if (key === '') throw new CliError(`the file named by ${fileName} is empty`, EXIT.auth);
     const mode = await context.fileMode(path);
-    // 所有者以外が読めるキーファイルは漏れている可能性があるので知らせる。止めはしない
+    // 所有者以外が読める (キーが漏れる) か書ける (キーを差し替えられる) ファイルは知らせる。止めはしない
     if (mode !== undefined && (mode & 0o077) !== 0) {
-      context.warn(`${path} is readable by other users (mode ${(mode & 0o777).toString(8)}); run 'chmod 600 ${path}'`);
+      context.warn(`${path} is accessible by other users (mode ${(mode & 0o777).toString(8)}); run 'chmod 600 ${path}'`);
     }
     return { key, source: { kind: 'file', name: fileName, path } };
   }

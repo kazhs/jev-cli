@@ -67,9 +67,12 @@ export async function runAuth(argv: string[], io: Io): Promise<void> {
       if (!io.stdinIsTTY) throw usageError("'jev auth set' needs a terminal to prompt for the key");
       await io.keychain.add(KEYCHAIN_SERVICE, spec.account);
       io.writeStdout(`saved to macOS Keychain (service ${KEYCHAIN_SERVICE}, account ${spec.account})\n`);
-      const direct = io.env[spec.envName];
-      if (direct !== undefined && direct !== '') {
-        io.writeStderr(`jev: warning: ${spec.envName} is set and takes precedence over the Keychain\n`);
+      const overriding = [spec.envName, fileEnvName(spec.envName)].filter((name) => {
+        const value = io.env[name];
+        return value !== undefined && value !== '';
+      });
+      for (const name of overriding) {
+        io.writeStderr(`jev: warning: ${name} is set and takes precedence over the Keychain\n`);
       }
       return;
     }

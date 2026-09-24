@@ -182,8 +182,16 @@ describe('run', () => {
   it('他人が読めるキーファイルは警告するが止めない', async () => {
     const io = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: '/k' }, files: { '/k': 'k' }, modes: { '/k': 0o100644 } });
     expect(await run(['-s', 'x', ...QUESTIONS], { io, version: '0.0.0', fetch: okFetch() })).toBe(0);
+    expect(io.stderr).toContain('accessible by other users');
     expect(io.stderr).toContain("chmod 600 /k");
     expect(io.stderr).not.toContain('k\n');
+  });
+
+  it('キーファイルのエラーにパスを出さない (キーそのものが入っていることがある)', async () => {
+    const io = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: 'sk-secret-value' } });
+    expect(await run(['-s', 'x', ...QUESTIONS], { io, version: '0.0.0', fetch: okFetch() })).toBe(3);
+    expect(io.stderr).toContain('AI_GATEWAY_API_KEY_FILE');
+    expect(io.stderr).not.toContain('sk-secret-value');
   });
 
   it('キーファイルが読めない・空なら exit 3', async () => {
@@ -219,10 +227,14 @@ describe('jev auth', () => {
     expect(keychain.added).toEqual(['jev-cli/vercel']);
   });
 
-  it('set で環境変数も設定されていれば、そちらが優先されると警告する', async () => {
+  it('set で環境変数やキーファイルも設定されていれば、そちらが優先されると警告する', async () => {
     const io = fakeIo({ env: { AI_GATEWAY_API_KEY: 'x' }, keychain: fakeKeychain(), stdinTty: true });
     expect(await run(['auth', 'set'], { io, version: '0.0.0' })).toBe(0);
-    expect(io.stderr).toContain('takes precedence');
+    expect(io.stderr).toContain('AI_GATEWAY_API_KEY is set and takes precedence');
+
+    const fileIo = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: '/k' }, keychain: fakeKeychain(), stdinTty: true });
+    expect(await run(['auth', 'set'], { io: fileIo, version: '0.0.0' })).toBe(0);
+    expect(fileIo.stderr).toContain('AI_GATEWAY_API_KEY_FILE is set and takes precedence');
   });
 
   it('delete は Keychain から消す', async () => {

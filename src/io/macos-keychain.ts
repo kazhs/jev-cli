@@ -8,12 +8,16 @@ const NOT_FOUND = 44;
 
 type ExecResult = { code: number; stdout: string; stderr: string };
 
+// 終了コードを返せない失敗 (シグナル終了・maxBuffer超過・起動失敗) も認証エラーとして扱う
+const unexpected = (error: unknown): CliError =>
+  new CliError(`keychain access failed: ${error instanceof Error ? error.message : String(error)}`, EXIT.auth);
+
 const exec = (args: string[]): Promise<ExecResult> =>
   new Promise((resolve, reject) => {
     execFile('security', args, (error, stdout, stderr) => {
       if (error === null) return resolve({ code: 0, stdout, stderr });
       if (typeof error.code === 'number') return resolve({ code: error.code, stdout, stderr });
-      reject(error);
+      reject(unexpected(error));
     });
   });
 
@@ -36,10 +40,10 @@ export const macosKeychain: Keychain = {
       const child = spawn('security', ['add-generic-password', '-U', '-s', service, '-a', account, '-w'], {
         stdio: 'inherit',
       });
-      child.on('error', reject);
-      child.on('exit', (code) => {
+      child.on('error', (error) => reject(unexpected(error)));
+      child.on('exit', (code, signal) => {
         if (code === 0) resolve();
-        else reject(new CliError(`keychain save failed (security exit ${String(code)})`, EXIT.auth));
+        else reject(new CliError(`keychain save failed (security ${code === null ? `signal ${String(signal)}` : `exit ${code}`})`, EXIT.auth));
       });
     });
   },

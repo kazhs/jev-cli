@@ -38,7 +38,7 @@ node dist/cli.js --help
 `jev` needs an [AI Gateway API key](https://vercel.com/docs/ai-gateway). It looks for the key in this order and uses the first one it finds:
 
 1. `AI_GATEWAY_API_KEY` — the key itself
-2. `AI_GATEWAY_API_KEY_FILE` — the path to a file that contains the key. Surrounding whitespace is ignored. `jev` warns if other users can read the file
+2. `AI_GATEWAY_API_KEY_FILE` — the path to a file that contains the key. Surrounding whitespace is ignored. `jev` warns if other users can read or write the file
 3. The macOS Keychain (service `jev-cli`, account `vercel`)
 
 The key is never accepted as a flag or an argument, because arguments are visible in the process list.

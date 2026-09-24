@@ -60,7 +60,7 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
   - TypeSafe直 (MVPの後): `TYPESAFE_API_KEY`
 - キーは次の順に探し、最初に見つかったものを使う
   1. 環境変数 (`AI_GATEWAY_API_KEY`)
-  2. `<環境変数>_FILE`で指定したファイル (`AI_GATEWAY_API_KEY_FILE`)。前後の空白を落として使う。所有者以外が読める権限なら警告を出す (止めはしない)
+  2. `<環境変数>_FILE`で指定したファイル (`AI_GATEWAY_API_KEY_FILE`)。前後の空白を落として使う。所有者以外が読めるか書ける権限なら警告を出す (止めはしない)。読めないときや空のときのエラーには、パスを出さない (パスの代わりにキーそのものが入っていることがあるため)
   3. macOSのKeychain (service `jev-cli`、account = プロバイダ名)。macOS以外では探さない
 - キーはフラグでもコマンドの引数でも受け付けない
 - `jev auth`で、Keychainに入れたキーを管理する
