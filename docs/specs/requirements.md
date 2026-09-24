@@ -31,16 +31,25 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
 - 合成: `--state key=@file`を複数並べると`{ key: ... }`のJSONにまとめる。`.json`はJSONとして、それ以外はテキストとして読む
   - 例: `--state thesis=@thesis.txt --state market=@snapshot.json` → `{ thesis: "...", market: {...} }`
 - stdinを読めるのは1か所だけ
+- `key=`の形として扱うのは、keyが識別子 (英字か`_`で始まる英数字と`_`) のときだけ。`識別子=`で始まるテキストをそのまま渡すなら、`@file`かstdinを使う
+- `@`で始まるテキストは`@@`で書く (`@@mention` → `@mention`)
+- ファイルとstdinから読んだ値は、末尾の改行を1つだけ落とす
 
 ### 質問 (リクエストの組み立て)
 
-- inlineフラグ: 型ごとにフラグを用意する (`--bool` / `--choice` / `--score`)
+- inlineフラグ: 型ごとにフラグを用意する (`--bool` / `--choice` / `--score`)。値は`name=質問文|criteria`
+  - criteriaは`,`区切り。boolean・choiceは`key:説明`、scoreは段階を低い順に並べる
+  - choiceは説明を省くと、選択肢名をそのまま説明に使う
+  - 質問文とcriteriaは最後の`|`で分ける。説明に`,`や`|`を含めるなら質問ファイルを使う
   - 例: `--choice direction="thesisの方向は?|long:上昇,short:下落,neutral:未定"`
   - 例: `--bool is_bullish="marketは上昇を示すか"`
 - YAMLファイル: `-f questions.yaml`
   - `questions`: 質問名 → `{ type, instructions, criteria }`
   - `state`: 実行時に渡すstateのキーと型の宣言 (text / json)。渡されなかったキーはエラーにする
+- 質問名は英字か`_`で始め、英数字・`_`・`-`だけで書く
+- 型ごとの制約はAPIに送る前に検証する (choiceは2〜255択、scoreは2〜10段階)
 - `-f`とinlineは併用できる。質問名が衝突したらエラーにする
+- `--model`でモデルを変えられる。優先順位は`--model` > 質問ファイルの`model` > `typesafe-ai/jev`
 - `--dry-run`: 組み立てたリクエストbodyを出してAPIは呼ばない (キー不要)
 
 ### プロバイダ
@@ -50,7 +59,11 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
   - Vercel: `AI_GATEWAY_API_KEY`
   - TypeSafe直 (MVPの後): `TYPESAFE_API_KEY`
 - キーはフラグでは受け付けない
-- **未確認**: エンドポイントを`/v1/evaluate` (PoCで実績あり) と`/v4/ai/evaluation-model` (既存CLIが使用) のどちらにするか。実装前に公式docsで確かめる。環境変数名も同じく確かめる
+- Vercelのエンドポイントは`POST https://ai-gateway.vercel.sh/v1/evaluate`、認証は`Authorization: Bearer $AI_GATEWAY_API_KEY` ([Vercel changelog](https://vercel.com/changelog/ai-gateway-now-supports-typesafe-clients-and-http-api-for-jev))
+- 質問の型と応答の形 ([Vercel KB](https://vercel.com/kb/guide/typesafe-jev-and-ai-sdk))
+  - `boolean`: `criteria`は`true` / `false`の説明で、省略できる。応答は`probability`
+  - `choice`: `criteria`は選択肢名 → 説明のmapで、選択肢は255個まで。応答は`choice`と`probabilities`
+  - `score`: `criteria`は段階の説明の配列 (低い段階から並べる) で、2〜10段階。応答は`score` (小数) と`probabilities` (段階の番号 → 確率)
 
 ### 出力
 
@@ -61,6 +74,8 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
 - 回答の出し方
   - choice: `choice`、各選択肢の確率、`confidence`
   - boolean: 確率。Jevはconfidenceを返さないので出さない (vaultの実測でも付いていなかった)
+  - score: `score`と各段階の確率
+- 応答に無い値は`n/a`と出す。jsonでは、取れなかった回答をキーごと落とさず`null`にする
 
 ### 終了コード
 
