@@ -47,6 +47,17 @@ jev --help
 
 The installed copy lives in `~/.local/lib/node_modules/jev-cli` and does not depend on the clone, so you can move or delete the clone afterwards. Run `pnpm run install-local` again to update it, and `pnpm run uninstall-local` to remove it. Set `PREFIX` to install somewhere else (`PREFIX=/opt/jev pnpm run install-local` puts the command in `/opt/jev/bin`).
 
+### With Claude Code
+
+This repository ships a project skill, `jev-dev-install` (`.claude/skills/jev-dev-install/`). When you open the repository in Claude Code, ask it to install jev (or run `/jev-dev-install`). It then does the following:
+
+- picks an install directory on your `PATH`, asking you when there is more than one candidate
+- runs `pnpm run install-local` and checks the installed build
+- checks the API key with `jev auth status`, and walks you through the Keychain or a key file if none is found
+- checks the run record directory (`JEV_CLI_OUTPUT_DIR`), creating it or offering to set one up, and offers to add the `export` line to your shell configuration
+
+It edits your shell configuration only to add that one line, and only after you approve. It never reads or types the API key.
+
 ## Authentication
 
 `jev` needs an [AI Gateway API key](https://vercel.com/docs/ai-gateway). It looks for the key in this order and uses the first one it finds:
