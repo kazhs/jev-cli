@@ -10,7 +10,8 @@ import { buildState, parseStateArg } from '../request/state.js';
 import { credentialContext, runAuth } from './auth.js';
 import { errorMessage } from '../shared.js';
 
-export const DEFAULT_MODEL = 'typesafe-ai/jev';
+// jev専用のCLIなので、モデルは切り替えさせない
+export const JEV_MODEL = 'typesafe-ai/jev';
 
 export const HELP = `usage: jev [options]
        jev auth <set|status|delete>
@@ -35,7 +36,6 @@ output:
       --dry-run             Print the assembled request without calling the API
 
 other:
-      --model <id>          Default: ${DEFAULT_MODEL}
       --provider <name>     Default: ${DEFAULT_PROVIDER}
       --timeout <ms>        Default: 30000
   -h, --help
@@ -59,7 +59,6 @@ const OPTIONS = {
   output: { type: 'string', short: 'o' },
   raw: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
-  model: { type: 'string' },
   provider: { type: 'string' },
   timeout: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
@@ -146,7 +145,7 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
   ];
   const questions = mergeQuestions(file.questions, inline);
   const state = await buildState((values.state ?? []).map(parseStateArg), io, file.state);
-  const request: EvaluateRequest = { model: values.model ?? file.model ?? DEFAULT_MODEL, state, questions };
+  const request: EvaluateRequest = { model: JEV_MODEL, state, questions };
 
   if (values['dry-run'] === true) {
     io.writeStdout(`${JSON.stringify(request, null, 2)}\n`);

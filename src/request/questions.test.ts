@@ -61,10 +61,9 @@ describe('validateQuestion', () => {
 });
 
 describe('parseQuestionFile', () => {
-  it('model / state / questions を読む', () => {
+  it('state / questions を読む', () => {
     const file = parseQuestionFile(
       [
-        'model: typesafe-ai/jev',
         'state:',
         '  thesis: text',
         '  market: json',
@@ -77,7 +76,6 @@ describe('parseQuestionFile', () => {
       'q.yaml',
     );
     expect(file).toEqual({
-      model: 'typesafe-ai/jev',
       state: { thesis: 'text', market: 'json' },
       questions: {
         direction: {
@@ -93,7 +91,8 @@ describe('parseQuestionFile', () => {
     ['YAMLとして読めない', 'questions: [unclosed'],
     ['トップレベルが配列', '- a'],
     ['未知のキー', 'questions: {}\nextra: 1'],
-    ['questions が無い', 'model: x'],
+    ['questions が無い', 'state: { a: text }'],
+    ['model は書けない', 'model: typesafe-ai/jev\nquestions: {}'],
     ['state の型が不正', 'state: { a: number }\nquestions: {}'],
   ])('%s は使い方の誤り', (_label, text) => {
     expectUsageError(() => parseQuestionFile(text, 'q.yaml'));
