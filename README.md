@@ -57,7 +57,7 @@ jev auth delete   # removes the key from the Keychain
 
 ### Key file
 
-Useful on Linux or in CI:
+For Linux, CI, or when you do not use the Keychain:
 
 ```sh
 mkdir -p ~/.config/jev
