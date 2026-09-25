@@ -1,18 +1,30 @@
 # jev-cli
 
+English | [日本語](README-ja.md)
+
 A command-line client for [Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev), TypeSafe AI's evaluation model.
 
 Jev does not generate text. You give it a *state* (text or JSON) and typed *questions*, and it returns probabilities: a probability for a yes/no question, a pick from a set of options, or a score on a scale. `jev` builds the request from flags or a YAML file, calls the model through [Vercel AI Gateway](https://vercel.com/docs/ai-gateway/modalities/evaluation), and prints the answers as text, JSON, or Markdown.
 
 ```console
-$ jev -s "I was charged twice" --bool "refund=Is the customer asking for money back?"
-refund: 79.0%
+$ jev -s "I was charged twice for my subscription" \
+    --bool "refund=Is the customer asking for money back?" \
+    --score "urgency=How urgent is this ticket?|low,medium,high"
+refund: 77.0%
+  question: Is the customer asking for money back?
+urgency: 1.26  (0:low 3.0% / 1:medium 68.0% / 2:high 29.0% / confidence 0.52)
+  question: How urgent is this ticket?
+  criteria: 0: low / 1: medium / 2: high
 
+state:
+  I was charged twice for my subscription
+
+startedAt: 2026-09-25T06:44:50.582Z
 provider: vercel / typesafe-ai/jev
-elapsed: 1098ms (local) / provider 122ms
-tokens: input 278 / output 20
-marketCost: 0.000011676
-generationId: gen_01M39ZKKYNNKFH2RNP93G2YAY0
+elapsed: 948ms (local) / provider 97ms
+tokens: input 318 / output 34
+marketCost: 0.000013356
+generationId: gen_01M3BMYGJ1NXKNY3CGSV78Q68H
 ```
 
 ## Install
