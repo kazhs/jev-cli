@@ -9,8 +9,6 @@ status: approved
 TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受けてJevにリクエストし、応答を整形して標準出力へ出す。指定があればファイルにも書く。
 主眼は**リクエストを簡単に組み立てられること**。
 
-参考: `~/github.com/kazhs/chart-insights/automation/jev-bias-poc.mjs` (PoC)、vaultの`wiki/entities/jev.md`
-
 ## 想定する使い方
 
 - 手元で対話的に使う
@@ -90,7 +88,7 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
   - 書けなかったら使い方の誤り (exit 2) にする
 - 回答の出し方
   - choice: `choice`、各選択肢の確率、`confidence`
-  - boolean: 確率。Jevはconfidenceを返さないので出さない (vaultの実測でも付いていなかった)
+  - boolean: 確率。Jevはconfidenceを返さないので出さない (実測でも付いていなかった)
   - score: `score`と各段階の確率
 - 応答に無い値は`n/a`と出す。jsonでは、取れなかった回答をキーごと落とさず`null`にする
 

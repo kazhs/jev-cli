@@ -17,7 +17,7 @@ GitHubに`jev-cli`という名前のリポジトリが5件あった。設計の�
   - TypeSafe直のAPIは`https://api.typesafe.ai/v1/systemone` (tumfのソースより)。直APIではyes/noの型を`noul`と呼ぶ
   - Vercel Gateway経由だと同じ型を`boolean`と呼ぶ。tumfはVercelを使うときに`noul`↔`boolean`を変換している
   - tumfはGatewayの`https://ai-gateway.vercel.sh/v4/ai/evaluation-model`に送っている。jtsang4は`@ai-sdk/gateway`の`evaluationModel()`を使っていて、その既定のbaseは`https://ai-gateway.vercel.sh/v4/ai`
-- `/v1/evaluate`は、chart-insightsのPoCで実際に叩いて応答が返っている (vaultの`wiki/entities/jev.md`)。`/v4/ai/...`との関係は未確認
+- `/v1/evaluate`は、このCLIを作る前のPoCで実際に叩いて応答が返っている。`/v4/ai/...`との関係は未確認
 
 ## 各CLI
 
