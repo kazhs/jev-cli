@@ -17,7 +17,9 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "install-local": "sh scripts/install-local.sh",
+    "uninstall-local": "sh scripts/install-local.sh uninstall"
   },
   "dependencies": {
     "yaml": "^2.9.1"
