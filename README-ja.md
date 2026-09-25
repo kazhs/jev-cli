@@ -47,6 +47,17 @@ jev --help
 
 入れたものは`~/.local/lib/node_modules/jev-cli`に置かれ、clone先には依存しない。入れたあとでclone先を移動しても消しても動く。更新するときは`pnpm run install-local`をもう一度実行し、外すときは`pnpm run uninstall-local`を実行する。別の場所に入れるなら`PREFIX`を指定する (`PREFIX=/opt/jev pnpm run install-local`なら`/opt/jev/bin`に入る)。
 
+### Claude Codeから入れる
+
+このrepoには、project skillの`jev-dev-install` (`.claude/skills/jev-dev-install/`) が入っている。Claude Codeでrepoを開き、「jevをインストールして」と頼むか、`/jev-dev-install`を実行すると、次を行う。
+
+- PATH上の入れ先を決める (候補が複数あれば聞く)
+- `pnpm run install-local`で入れ、入ったビルドを確かめる
+- `jev auth status`でAPIキーを確かめ、見つからなければKeychainかキーファイルでの設定を案内する
+- 実行の記録を残すディレクトリ (`JEV_CLI_OUTPUT_DIR`) を確かめ、無ければ作るか、設定するかを聞く。設定するなら、shellの設定ファイルに`export`の行を書き足すことを提案する
+
+shellの設定ファイルを書き換えるのは、承認を得てその1行を足すときだけ。APIキーを読むことも入力することもしない。
+
 ## 認証
 
 `jev`には[AI GatewayのAPIキー](https://vercel.com/docs/ai-gateway)が要る。キーは次の順に探し、最初に見つかったものを使う。
