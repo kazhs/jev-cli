@@ -81,6 +81,13 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
 - `--raw`: APIの応答bodyを加工せず出す
 - `-o path`: 標準出力とファイルの両方に書く。ファイルの形式は拡張子で決め (`.json`→json、`.md`→md)、それ以外の拡張子は`--format`に従う
 - 付帯情報として、手元計測の所要時間・プロバイダ側の所要時間・token数・コスト (`marketCost`)・generationIdを出す
+- 入力は常に全部出力に残す (オプションにしない)。jsonは`request` (model・state・questions) を持つ。textは質問ごとに`instructions`と`criteria`を添え、stateも出す。mdは`## State`と`## Questions`の節を持つ。scoreの確率は、段階の番号に段階の説明を添えて出す
+- 実行を始めた時刻 (`startedAt`、UTCのISO 8601) を付帯情報に含める
+- 環境変数`JEV_CLI_OUTPUT_DIR`があれば、実行ごとにそのディレクトリへ`<UTCの日時>-<generationId>.json`を1つ書く (`-o`を付けなくても書く)
+  - 中身は`--format json`と同じ。stdoutの`--format`や`--raw`に関係なく、常にこの形
+  - `-o`とは独立で、両方を指定すれば両方に書く
+  - `--dry-run`のときと、APIの呼び出しが失敗したときは書かない
+  - 書けなかったら使い方の誤り (exit 2) にする
 - 回答の出し方
   - choice: `choice`、各選択肢の確率、`confidence`
   - boolean: 確率。Jevはconfidenceを返さないので出さない (vaultの実測でも付いていなかった)

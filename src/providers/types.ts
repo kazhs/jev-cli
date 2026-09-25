@@ -48,6 +48,7 @@ export type Answer = BooleanAnswer | ChoiceAnswer | ScoreAnswer;
 // 応答に無かった値は undefined のまま持つ (推測で埋めない)
 export type EvaluateMeta = {
   provider: string;
+  startedAt?: string;
   model?: string;
   elapsedMs: number;
   providerMs?: number;
