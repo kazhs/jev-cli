@@ -112,8 +112,6 @@ Question names must start with a letter or `_` and contain only letters, digits,
 
 ```yaml
 # questions/thesis.yaml
-model: typesafe-ai/jev   # optional
-
 state:                   # optional: declare the keys that -s must provide
   thesis: text
   market: json
@@ -195,7 +193,6 @@ JSON output has this shape:
 
 | Flag | Default |
 | --- | --- |
-| `--model <id>` | The question file's `model`, then `typesafe-ai/jev` |
 | `--provider <name>` | `vercel` |
 | `--timeout <ms>` | `30000` (1 to 2147483647) |
 

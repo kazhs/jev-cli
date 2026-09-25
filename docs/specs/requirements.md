@@ -50,7 +50,7 @@ TypeSafe AIの評価モデルJev (`typesafe-ai/jev`) を呼ぶCLI。入力を受
 - 型ごとの制約はAPIに送る前に検証する (choiceは2〜255択、scoreは2〜10段階)
 - `-f`とinlineは併用できる。質問名が衝突したらエラーにする
 - `--timeout`はms単位の整数で、1〜2147483647 (Nodeのタイマーの上限) の範囲。範囲外は使い方の誤りにする
-- `--model`でモデルを変えられる。優先順位は`--model` > 質問ファイルの`model` > `typesafe-ai/jev`
+- モデルは`typesafe-ai/jev`に固定する (jev専用のCLIなので、フラグでも質問ファイルでも変えられない)
 - `--dry-run`: 組み立てたリクエストbodyを出してAPIは呼ばない (キー不要)
 
 ### プロバイダ
