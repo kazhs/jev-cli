@@ -119,7 +119,7 @@ describe('run', () => {
     const io = fakeIo({ tty: true });
     await run(['-s', 'x', ...QUESTIONS, '-o', 'out/result.md'], { io, version: '0.0.0', fetch: okFetch() });
     expect(io.stdout).toContain('refund: 98.0%');
-    expect(io.written['out/result.md']).toContain('| refund | boolean | 98.0% |');
+    expect(io.written['out/result.md']).toContain('| refund | boolean | 返金を求めているか | 98.0% |');
   });
 
   it('拡張子で決まらないファイルは --format に従う', async () => {
@@ -199,6 +199,69 @@ describe('run', () => {
     expect(await run(['-s', 'x', ...QUESTIONS], { io: missing, version: '0.0.0', fetch: okFetch() })).toBe(3);
     const empty = fakeIo({ env: { AI_GATEWAY_API_KEY_FILE: '/k' }, files: { '/k': '\n' } });
     expect(await run(['-s', 'x', ...QUESTIONS], { io: empty, version: '0.0.0', fetch: okFetch() })).toBe(3);
+  });
+});
+
+describe('入力の記録', () => {
+  const NOW = () => new Date('2026-09-25T02:15:30.123Z');
+
+  it('json は request (state・questions) と startedAt を含む', async () => {
+    const io = fakeIo();
+    await run(['-s', 'thesis=二重請求', ...QUESTIONS], { io, version: '0.0.0', fetch: okFetch(), now: NOW });
+    expect(JSON.parse(io.stdout)).toMatchObject({
+      request: {
+        model: 'typesafe-ai/jev',
+        state: { thesis: '二重請求' },
+        questions: { refund: { type: 'boolean', instructions: '返金を求めているか' } },
+      },
+      meta: { startedAt: '2026-09-25T02:15:30.123Z' },
+    });
+  });
+
+  it('text は質問文・criteria・state を出し、score の段階に説明を添える', async () => {
+    const io = fakeIo({ tty: true });
+    await run(
+      ['-s', 'x', ...QUESTIONS, '--score', 'quality=品質は|a,b,c,d', '--choice', 'route=振り分け先|billing:請求,shipping:配送'],
+      { io, version: '0.0.0', fetch: okFetch() },
+    );
+    expect(io.stdout).toContain('  question: 返金を求めているか');
+    expect(io.stdout).toContain('  criteria: billing: 請求 / shipping: 配送');
+    expect(io.stdout).toContain('3:d 98.0%');
+    expect(io.stdout).toContain('state:\n  x');
+  });
+
+  it('md は State と Questions の節を持ち、state の ``` でフェンスが閉じない', async () => {
+    const io = fakeIo();
+    await run(['-s', 'a ``` b', ...QUESTIONS, '--format', 'md'], { io, version: '0.0.0', fetch: okFetch() });
+    expect(io.stdout).toContain('## State\n\n````text\na ``` b\n````');
+    expect(io.stdout).toContain('## Questions');
+  });
+
+  it('JEV_CLI_OUTPUT_DIR があれば、実行ごとに json を1つ書く', async () => {
+    const io = fakeIo({ env: { AI_GATEWAY_API_KEY: 'k', JEV_CLI_OUTPUT_DIR: '/runs' } });
+    expect(await run(['-s', 'x', ...QUESTIONS, '--format', 'text'], { io, version: '0.0.0', fetch: okFetch(), now: NOW })).toBe(0);
+    expect(Object.keys(io.written)).toEqual(['/runs/20260925T021530Z-gen_test.json']);
+    expect(JSON.parse(io.written['/runs/20260925T021530Z-gen_test.json'] ?? '')).toMatchObject({
+      request: { state: 'x' },
+      answers: { refund: { probability: 0.98 } },
+      meta: { generationId: 'gen_test', startedAt: '2026-09-25T02:15:30.123Z' },
+    });
+  });
+
+  it('JEV_CLI_OUTPUT_DIR は -o と両方に書き、--dry-run と失敗時は書かない', async () => {
+    const env = { AI_GATEWAY_API_KEY: 'k', JEV_CLI_OUTPUT_DIR: '/runs' };
+    const both = fakeIo({ env });
+    await run(['-s', 'x', ...QUESTIONS, '-o', 'out.md'], { io: both, version: '0.0.0', fetch: okFetch(), now: NOW });
+    expect(Object.keys(both.written).sort()).toEqual(['/runs/20260925T021530Z-gen_test.json', 'out.md']);
+
+    const dry = fakeIo({ env });
+    await run(['-s', 'x', ...QUESTIONS, '--dry-run'], { io: dry, version: '0.0.0', now: NOW });
+    expect(dry.written).toEqual({});
+
+    const failing = fakeIo({ env });
+    const fail500 = (async () => new Response('boom', { status: 500 })) as typeof fetch;
+    expect(await run(['-s', 'x', ...QUESTIONS], { io: failing, version: '0.0.0', fetch: fail500, now: NOW })).toBe(1);
+    expect(failing.written).toEqual({});
   });
 });
 

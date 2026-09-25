@@ -167,15 +167,25 @@ Jev evaluates all questions in a request independently and in parallel, so one q
 
 Choice and score answers show the probability of each option or level, plus `confidence` when the API returns it. Values missing from the response are shown as `n/a` in text and Markdown, and as `null` in JSON.
 
+Every output also records the input. Text shows each question's instructions and criteria plus the state; Markdown adds `## State` and `## Questions` sections; JSON has a `request` field. Score levels are shown with their descriptions (`3:excellent 98.0%`).
+
 JSON output has this shape:
 
 ```json
 {
+  "request": {
+    "model": "typesafe-ai/jev",
+    "state": "I was charged twice",
+    "questions": {
+      "refund": { "type": "boolean", "instructions": "Is the customer asking for money back?" }
+    }
+  },
   "answers": {
     "refund": { "type": "boolean", "probability": 0.79 }
   },
   "meta": {
     "provider": "vercel",
+    "startedAt": "2026-09-25T02:15:30.123Z",
     "model": "typesafe-ai/jev",
     "elapsedMs": 1098,
     "providerMs": 122,
@@ -188,6 +198,18 @@ JSON output has this shape:
 ```
 
 `elapsedMs` is measured locally and includes the network round trip. `providerMs` is the provider call time recorded by the gateway.
+
+### Run records
+
+Set `JEV_CLI_OUTPUT_DIR` to keep every evaluation as a file, without passing `-o`:
+
+```sh
+export JEV_CLI_OUTPUT_DIR=~/jev-runs
+jev -s "I was charged twice" --bool "refund=Is the customer asking for money back?"
+# also writes ~/jev-runs/20260925T021530Z-gen_01M39ZKKYNNKFH2RNP93G2YAY0.json
+```
+
+Each file has the same content as `--format json` (request, answers, and meta), whatever `--format` or `--raw` is used for stdout. File names start with the UTC start time, so sorting by name gives chronological order. It works alongside `-o`. Nothing is written for `--dry-run` or when the API call fails.
 
 ## Other options
 

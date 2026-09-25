@@ -1,8 +1,9 @@
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { missingKeyMessage, resolveApiKey } from '../credentials/resolve.js';
 import { CliError, EXIT, type ExitCode, usageError } from '../errors.js';
 import type { Io } from '../io/node-io.js';
-import { OUTPUT_FORMATS, type OutputFormat, formatRaw, formatResult } from '../output/format.js';
+import { OUTPUT_FORMATS, type OutputFormat, formatJson, formatRaw, formatResult } from '../output/format.js';
 import { DEFAULT_PROVIDER, PROVIDER_KEYS, createProvider, parseProviderName } from '../providers/index.js';
 import type { EvaluateRequest, Question } from '../providers/types.js';
 import { mergeQuestions, parseInlineQuestion, parseQuestionFile, type QuestionFile } from '../request/questions.js';
@@ -32,6 +33,7 @@ questions:
 output:
       --format <text|json|md>  Default: text if stdout is a TTY, json otherwise
   -o, --output <path>       Also write to a file in addition to stdout. Format is chosen by extension (.json / .md), otherwise follows --format
+                            Every output includes the full request (state and questions)
       --raw                 Print the API response as-is
       --dry-run             Print the assembled request without calling the API
 
@@ -40,6 +42,10 @@ other:
       --timeout <ms>        Default: 30000
   -h, --help
   -v, --version
+
+Run records:
+  JEV_CLI_OUTPUT_DIR        If set, every evaluation is also saved there as <UTC time>-<generationId>.json
+                            (same content as --format json). Not written with --dry-run or when the call fails
 
 API key (provider vercel), looked up in this order:
   AI_GATEWAY_API_KEY        The key itself
@@ -93,11 +99,21 @@ function parseTimeout(value: string | undefined): number | undefined {
   return ms;
 }
 
+export const OUTPUT_DIR_ENV = 'JEV_CLI_OUTPUT_DIR';
+
 export type RunDeps = {
   io: Io;
   version: string;
   fetch?: typeof fetch;
+  now?: () => Date;
 };
+
+// 名前順に並べると時系列になるよう、UTCの日時を先頭に置く。generationIdで同じ秒の実行も区別する
+function recordFileName(startedAt: Date, generationId: string | undefined): string {
+  const stamp = startedAt.toISOString().replace(/\.\d{3}Z$/, 'Z').replaceAll('-', '').replaceAll(':', '');
+  const id = generationId ?? `no-generation-id-${Math.random().toString(36).slice(2, 10)}`;
+  return `${stamp}-${id.replaceAll(/[^A-Za-z0-9_-]/g, '_')}.json`;
+}
 
 async function execute(argv: string[], deps: RunDeps): Promise<void> {
   const { io } = deps;
@@ -160,10 +176,12 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
     timeoutMs,
     fetch: deps.fetch,
   });
+  const startedAt = (deps.now ?? (() => new Date()))();
   const result = await provider.evaluate(request);
+  result.meta.startedAt = startedAt.toISOString();
 
   const render = (target: OutputFormat): string =>
-    values.raw === true ? formatRaw(result) : formatResult(result, target, questions);
+    values.raw === true ? formatRaw(result) : formatResult(result, target, request);
   io.writeStdout(render(format ?? (io.stdoutIsTTY ? 'text' : 'json')));
   if (values.output !== undefined) {
     const path = values.output;
@@ -171,6 +189,15 @@ async function execute(argv: string[], deps: RunDeps): Promise<void> {
       await io.writeFile(path, render(formatForFile(path, format)));
     } catch (error) {
       throw usageError(`cannot write file (${path}): ${errorMessage(error)}`);
+    }
+  }
+  const outputDir = io.env[OUTPUT_DIR_ENV];
+  if (outputDir !== undefined && outputDir !== '') {
+    const path = join(outputDir, recordFileName(startedAt, result.meta.generationId));
+    try {
+      await io.writeFile(path, formatJson(result, request));
+    } catch (error) {
+      throw usageError(`cannot write the run record to ${OUTPUT_DIR_ENV} (${path}): ${errorMessage(error)}`);
     }
   }
 }
