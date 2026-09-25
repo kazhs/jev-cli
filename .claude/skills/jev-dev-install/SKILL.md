@@ -1,11 +1,11 @@
 ---
 name: jev-dev-install
-description: jev-cliのrepoをビルドし、PATHの通ったディレクトリに`jev`コマンドとしてインストールする。APIキーが未設定なら、その場で設定まで案内する。実行の記録を残すディレクトリ (`JEV_CLI_OUTPUT_DIR`) の設定と作成も案内する。コードを変えたあとにローカルの`jev`へ反映したいとき、`jev`がcommand not foundになるとき、新しいマシンでjevを使えるようにしたいときにも使う。発火語 - jev-dev-install / jevをインストール / jevを入れ直す / jevを更新して入れて / jevをPATHに入れる / ローカルのjevを最新にする / jevが見つからない / JEV_CLI_OUTPUT_DIRを設定したい / jevの実行記録を残したい。非発火 - npmに公開する作業、`jev`コマンドで評価を実行する依頼、APIキーの値そのものを扱う依頼。
+description: jev-cliのrepoをビルドし、PATHの通ったディレクトリに`jev`コマンドとしてインストールする。APIキーが未設定なら、その場で設定まで案内する。実行の記録を残すディレクトリ (`JEV_CLI_OUTPUT_DIR`) の設定と作成、`jev`を使うためのskill (`jev-cli`) のインストールも案内する。コードを変えたあとにローカルの`jev`へ反映したいとき、`jev`がcommand not foundになるとき、新しいマシンでjevを使えるようにしたいときにも使う。発火語 - jev-dev-install / jevをインストール / jevを入れ直す / jevを更新して入れて / jevをPATHに入れる / ローカルのjevを最新にする / jevが見つからない / JEV_CLI_OUTPUT_DIRを設定したい / jevの実行記録を残したい / jev-cli skillを入れたい / jev-cli skillを更新したい。非発火 - npmに公開する作業、`jev`コマンドで評価を実行する依頼、APIキーの値そのものを扱う依頼。
 ---
 
 # jev-dev-install
 
-jev-cliのrepoから`jev`をビルドし、PATHの通ったディレクトリへ入れる。入れたあと、APIキーが見つかる状態かを確かめ、見つからなければ設定を案内する。最後に、実行の記録を残すディレクトリ (`JEV_CLI_OUTPUT_DIR`) を確かめる。
+jev-cliのrepoから`jev`をビルドし、PATHの通ったディレクトリへ入れる。入れたあと、APIキーが見つかる状態かを確かめ、見つからなければ設定を案内する。続けて、実行の記録を残すディレクトリ (`JEV_CLI_OUTPUT_DIR`) を確かめ、最後に`jev`を使うためのskill (`jev-cli`) が入っているかを確かめる。
 
 インストールの実体はrepoの`scripts/install-local.sh` (`pnpm run install-local`) で、`$PREFIX/bin/jev`に入れる。このskillが受け持つのは、`PREFIX`を決めることと、その前後の確認。スクリプトはビルド→pack→`npm install -g --prefix`を行うので、入れたものはrepoの場所や`node_modules`に依存しない。そのかわり、コードを変えたら入れ直すまで反映されない。
 
@@ -15,6 +15,7 @@ jev-cliのrepoから`jev`をビルドし、PATHの通ったディレクトリへ
 - **キーの値を読まない・入力しない・表示しない**。キーファイルや`.env`の中身もコンテキストに載せない
 - **`jev auth set`をBashで実行しない**。`security`コマンドが端末でキーを聞く作りで、端末の無いBashからは入力できない (`jev`もexit 2で止める)
 - git書き込み (commit・push等) をしない
+- `jev-cli` skillは、callerが承認したときだけ入れる・更新する (手順7)
 
 `jev auth status`は承認なしで実行してよい。Keychainやキーファイルを読むが、出力するのはキーの読み先だけで値は出さず、外部へのアクセスもしない。
 
@@ -121,6 +122,28 @@ shellの設定ファイルに行がある、または書き足したのに、Bas
 4. `AskUserQuestion`で「<ファイル>の末尾に<行>を書き足すか」を聞く。選択肢は「書き足す」と「自分でやる」。ファイルがsymlinkなら、リンク先の実体のパスも質問に書く (dotfilesのrepoを書き換えることになるため)
 5. 「書き足す」なら、空行・`# jev-cli: run records`のコメント行・決めた行の3行をファイルの末尾に足す。足したら`tail -n 3`で確かめる。「自分でやる」なら、書き足す行だけを示す
 
+### 7. jev-cli skillを確かめる
+
+repoの`skills/jev-cli/`には、`jev`コマンドを使う側のskill (`jev-cli`) がある。質問の組み立て・実行・結果の読み解き・記録の集計を受け持つ。Claude Codeに入っているかを確かめ、無ければ入れることを、古ければ更新することを提案する。
+
+1. 入っているかを調べる
+   - `gh`があるなら`gh skill list --agent claude-code --json skillName,scope,path -q '.[] | select(.skillName=="jev-cli")'`を実行する。exit 0で何も出なければ入っていない。出たら、その`path` (skillのディレクトリ) と`scope`を控える。複数出たら (userとprojectの両方に入っている等)、それぞれについて3を行う。exitが0以外なら、エラーの全文を報告して手順7を終える
+   - `gh`が無ければ、`~/.claude/skills/jev-cli/SKILL.md`と、callerの今いるrepoの`.claude/skills/jev-cli/SKILL.md`があるかを見る
+2. 入っていない → `AskUserQuestion`で入れるかを聞く。質問文には、`jev-cli` skillが入っていないことと、入れると全PJのClaude Codeから使えるようになることを書く。選択肢は「全PJで使えるように入れる」と「入れない」の2つ。「入れる」なら次を実行し、もう一度1で入ったことを確かめる
+   - `gh`がある: `gh skill install <repoのルート> jev-cli --from-local --agent claude-code --scope user`
+   - `gh`が無い: `mkdir -p ~/.claude/skills && cp -R <repoのルート>/skills/jev-cli ~/.claude/skills/`
+   - `--from-local`でrepoから入れるのは、手順3で入れた`jev`と同じ版のskillにそろえるため
+   - `gh skill install`がexit 0以外なら、出力の全文を報告して手順7を終える。exit 0でも出る`! Skills may contain prompt injections…`の警告は、想定内なので報告には書かない
+   - 入れたあとの1で出てこなければ、そのことと`gh skill install`の出力の全文を報告して手順7を終える
+3. 入っている → 入っている`<控えたpath>/SKILL.md` (`gh`が無いときは、見つけた`SKILL.md`) と、repoの`skills/jev-cli/SKILL.md`の本文を比べる。`gh skill install`はfrontmatterを書き直す (来歴の項目を足し、直後の空行を落とす) ので、frontmatterと先頭の空行は比べない (`diff <(sed '1,/^---$/d' <入っている方> | sed '/./,$!d') <(sed '1,/^---$/d' <repoの方> | sed '/./,$!d')`)
+   `diff`はパイプに通さずに実行し、終了コードをすぐに見る (パイプに通すと、`diff`の終了コードが取れなくなる)。
+
+   - `diff`がexit 0 (同じ) → そのまま報告に書く
+   - `diff`がexit 2以上 → ファイルが読めなかった。エラーの全文を報告して手順7を終える
+   - `diff`がexit 1 (違う) → `AskUserQuestion`で更新するかを聞く (「更新する」と「そのままにする」)。「更新する」なら、2のコマンドに`--force`を付けて、控えた`scope`で入れ直す (`gh`が無ければ、コピーし直す)。入れ直したら、同じ`diff`がexit 0になることを確かめる
+
+Claude Code以外のエージェントを使っているとcallerが言ったら、入れも調べもしない。`gh skill install kazhs/jev-cli jev-cli --agent <エージェント>`の形と、`--agent`の値は`gh skill install --help`で見られることを伝える。
+
 ## 報告
 
 次を書く。
@@ -130,4 +153,5 @@ shellの設定ファイルに行がある、または書き足したのに、Bas
 - `command -v jev`の結果。入れた場所と違えば、その旨
 - `jev auth status`の結果 (キーの読み先)。キーを案内した場合は、案内した方法と、設定後に`status`が0になったか。callerの返事を待っているなら「未確認 (callerの設定待ち)」と書く
 - `JEV_CLI_OUTPUT_DIR`の状態 (設定済みで使える、作った、書き込めない、設定しないことにした、のどれか)。shellの設定ファイルにはあるがこのセッションには反映されていないときは、そのことも添える。作ったならそのパス。shellの設定ファイルに書き足したなら、そのファイルと行 (既に行があって書き足さなかったなら、その既存の行)。callerの返事を待っているなら「未確認 (callerの返事待ち)」と書く
+- `jev-cli` skillの状態 (入っていて最新、入れた、更新した、入れないことにした、古いがそのままにした、のどれか)。入っているなら、その`path`と`scope`
 - 途中で止まった場合は、止まった手順とエラーの全文

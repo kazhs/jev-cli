@@ -55,6 +55,7 @@ jev --help
 - `pnpm run install-local`で入れ、入ったビルドを確かめる
 - `jev auth status`でAPIキーを確かめ、見つからなければKeychainかキーファイルでの設定を案内する
 - 実行の記録を残すディレクトリ (`JEV_CLI_OUTPUT_DIR`) を確かめ、無ければ作るか、設定するかを聞く。設定するなら、shellの設定ファイルに`export`の行を書き足すことを提案する
+- Claude Codeに[`jev-cli` skill](#エージェント用のskill)が入っているかを確かめ、入れるか更新するかを聞く
 
 shellの設定ファイルを書き換えるのは、承認を得てその1行を足すときだけ。APIキーを読むことも入力することもしない。
 
@@ -251,6 +252,37 @@ jev -s "I was charged twice" --bool "refund=Is the customer asking for money bac
 | 1 | APIエラー (HTTPエラー・JSONでない応答・タイムアウト・ネットワークの失敗) |
 | 2 | 使い方の誤り (フラグ・質問ファイル・state) |
 | 3 | 認証 (キーが見つからない・キーファイルが読めない / 空・Keychainの失敗・HTTP 401 / 403) |
+
+## エージェント用のskill
+
+このrepoには、AIコーディングエージェントに`jev`を使わせるための[Agent Skill](https://agentskills.io/specification)、`jev-cli` (`skills/jev-cli/`) も入っている。これを入れたエージェントは、次のことをする。
+
+- 「この問い合わせを分類して」「このデータは考察を支持している？」のような依頼を、`boolean` / `choice` / `score`の質問に組み立てる。[質問](#質問)の節にある落とし穴 (ある質問から別の質問の答えを参照できない、等) を避ける
+- `jev`を実行し (先に`--dry-run`、次に`--format json`)、決めきれなかった答えも含めて、答えごとに確率を添えて報告する
+- `JEV_CLI_OUTPUT_DIR`の実行の記録を集計する。比べるのは、同じ質問をした実行どうしだけ
+
+skillは`jev`コマンドを使うので、先に`jev`を入れておく ([インストール](#インストール))。
+
+### skillのインストール
+
+[GitHub CLI](https://cli.github.com/)を使う場合 (`gh skill`はpreview):
+
+```sh
+# Claude Code、全PJで使う
+gh skill install kazhs/jev-cli jev-cli --agent claude-code --scope user
+
+# Claude Code、今いるrepoだけで使う
+gh skill install kazhs/jev-cli jev-cli --agent claude-code --scope project
+```
+
+ほかのエージェントには、別の`--agent`の値 (`codex`、`cursor`、`github-copilot`等) を渡す。使える値は`gh skill install --help`で見られる。更新するときは、同じコマンドに`--force`を付けて実行する。
+
+GitHub CLIを使わない場合は、ディレクトリをエージェントのskillのディレクトリにコピーする。Claude Codeなら次のとおり。
+
+```sh
+mkdir -p ~/.claude/skills
+cp -R skills/jev-cli ~/.claude/skills/
+```
 
 ## 開発
 

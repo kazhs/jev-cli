@@ -55,6 +55,7 @@ This repository ships a project skill, `jev-dev-install` (`.claude/skills/jev-de
 - runs `pnpm run install-local` and checks the installed build
 - checks the API key with `jev auth status`, and walks you through the Keychain or a key file if none is found
 - checks the run record directory (`JEV_CLI_OUTPUT_DIR`), creating it or offering to set one up, and offers to add the `export` line to your shell configuration
+- checks whether the [`jev-cli` agent skill](#agent-skill) is installed for Claude Code, and offers to install or update it
 
 It edits your shell configuration only to add that one line, and only after you approve. It never reads or types the API key.
 
@@ -251,6 +252,37 @@ Each file has the same content as `--format json` (request, answers, and meta), 
 | 1 | API error (HTTP error, non-JSON response, timeout, network failure) |
 | 2 | Usage error (flags, question file, or state) |
 | 3 | Authentication (no key found, unreadable or empty key file, Keychain failure, HTTP 401 / 403) |
+
+## Agent skill
+
+This repository also ships an [Agent Skill](https://agentskills.io/specification), `jev-cli` (`skills/jev-cli/`), for AI coding agents that run the `jev` command for you. With it, an agent:
+
+- turns a plain request ("classify this ticket", "does this data support the thesis?") into `boolean` / `choice` / `score` questions, avoiding the traps described in [Questions](#questions) (for example, one question cannot refer to another's answer)
+- runs `jev` (a `--dry-run` first, then `--format json`) and reports each answer with its probabilities, including undecided ones
+- aggregates the run records in `JEV_CLI_OUTPUT_DIR`, comparing only runs that asked the same question
+
+The skill uses the `jev` command, so install `jev` first ([Install](#install)).
+
+### Installing the skill
+
+With the [GitHub CLI](https://cli.github.com/) (`gh skill` is in preview):
+
+```sh
+# Claude Code, available in every project
+gh skill install kazhs/jev-cli jev-cli --agent claude-code --scope user
+
+# Claude Code, only in the current repository
+gh skill install kazhs/jev-cli jev-cli --agent claude-code --scope project
+```
+
+Pass another `--agent` value (`codex`, `cursor`, `github-copilot`, ...) for other agents; `gh skill install --help` lists them. Run the same command with `--force` to update the skill.
+
+Without the GitHub CLI, copy the directory into your agent's skills directory. For Claude Code:
+
+```sh
+mkdir -p ~/.claude/skills
+cp -R skills/jev-cli ~/.claude/skills/
+```
 
 ## Development
 
