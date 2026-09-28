@@ -1,7 +1,6 @@
 ---
 title: ドキュメントナビゲーション
 type: guide
-status: approved
 ---
 
 # ドキュメント
@@ -36,17 +35,10 @@ Markdown + YAML frontmatterで書く。
 ---
 title: ドキュメントタイトル
 type: spec        # spec / adr / guide / runbook / research
-status: draft
 ---
 ```
 
-`status`の候補は`type`ごとに違う。
-
-| type | `status`の候補 |
-| --- | --- |
-| `spec` `guide` `runbook` | `draft` / `review` / `approved` / `deprecated` |
-| `adr` | `proposed` / `approved` / `superseded` / `deprecated` |
-| `research` | 付けない |
+保護ブランチにある文書は承認済みとみなし、`status`は付けない。
 
 ### 記述原則
 
@@ -69,5 +61,5 @@ status: draft
 | --- | --- |
 | 誤記・体裁・リンク切れ | 既存のADRを直接直す |
 | 決定事項の補足 | 既存のADRに追記し、`updated`を更新する |
-| 決定事項そのものの変更・撤回 | 新しいADRを作る。古いADRを`superseded`にし、相互にリンクする |
+| 決定事項そのものの変更・撤回 | 新しいADRを作る。古いADRに決定が置き換わった旨を記し、相互にリンクする |
 | スコープ・前提の追加 | 新しいADRで扱い、関連するADRとして参照する |

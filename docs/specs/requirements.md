@@ -1,7 +1,6 @@
 ---
 title: jev-cli 要件
 type: spec
-status: approved
 ---
 
 # jev-cli 要件
